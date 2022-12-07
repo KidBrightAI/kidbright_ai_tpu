@@ -18,8 +18,8 @@ from PIL import ImageFont
 
 from sensor_msgs.msg import CompressedImage
 from geometry_msgs.msg import Twist
-from kidbright_ai_tpu.msg import tpu_object
-from kidbright_ai_tpu.msg import tpu_objects
+from kidbright_tpu.msg import tpu_object
+from kidbright_tpu.msg import tpu_objects
 
 VERBOSE=False
 

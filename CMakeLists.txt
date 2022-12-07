@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(kidbright_ai_tpu)
+project(kidbright_tpu)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -147,6 +147,7 @@ include_directories(
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
 install(PROGRAMS
+   scripts/cam_stream.py
    scripts/tpu_detect.py
    scripts/tpu_classify.py
    scripts/save_wave.py
