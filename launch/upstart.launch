@@ -1,0 +1,10 @@
+<launch>
+	<node pkg="rosbridge_server" type="rosbridge_websocket" name="rosbridge_websocket"/>
+	<node pkg="web_video_server" type="web_video_server" name="web_video_server"/>
+ 	<node pkg="kidbright_tpu" type="cam_stream.py" name="cam_stream"/>
+    <!-- Start ROS communication between the robot's computer and Linorobot base -->
+    <node pkg="rosserial_python" name="rosserial_lino" type="serial_node.py" output="screen">
+        <param name="port" value="/dev/ttyACM0" />
+        <param name="baud" value="57600" />
+    </node>
+</launch>

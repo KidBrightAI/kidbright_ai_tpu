@@ -1,0 +1,9 @@
+#goal definition
+string projectname
+float32 duration
+---
+#result definition
+string result
+---
+#feedback
+string status
