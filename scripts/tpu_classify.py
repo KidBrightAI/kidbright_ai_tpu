@@ -22,6 +22,10 @@ from pycoral.adapters import common
 from pycoral.utils.dataset import read_label_file
 from pycoral.utils.edgetpu import make_interpreter
 
+#YOLO
+from decoder import YoloDecoder
+from box import to_minmax
+
 VERBOSE=False
 
 class image_feature:
@@ -35,6 +39,9 @@ class image_feature:
         _, self.input_height, self.input_width, _ = self.input_details['shape']
         self.output_details = self.interpreter.get_output_details()[0]
 
+        #YOLO 
+        self.decoder = YoloDecoder(anchor)
+
         # To publish topic
         self.image_pub = rospy.Publisher("/output/image_detected/compressed", CompressedImage, queue_size = 5, tcp_nodelay=False)
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
@@ -46,13 +53,13 @@ class image_feature:
         rospy.init_node('image_class', anonymous=False)
   
     def preprocess(self, img):
-        img = cv2.resize(img, (self.input_width, self.input_height))
+        
         img = img.astype(np.float32)
         img = img / 255.
         img = img - 0.5
         img = img * 2.
         img = img[:, :, ::-1]
-        img = np.expand_dims(img, 0)
+        
         return img
 
     def callback(self, ros_data):
@@ -63,28 +70,15 @@ class image_feature:
         image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB) 
 
         # resize image
-        input_np = [image_np.copy()] # self.preprocess(image_np)
+        input_np = cv2.resize(image_np.copy(), (self.input_width, self.input_height))
+        input_np = np.expand_dims(image_np, 0)
+        #input_np = [image_np.copy()]
 
-        # quantize image 
-        # print(input_np[0][10][10][2])
-        # input_details = self.interpreter.get_input_details()[0]
-        # input_type = input_details["dtype"]
-        # if input_type == np.uint8:
-        #     image_np = image_np.astype(np.float32)
-        #     input_scale, input_zero_point = input_details['quantization']
-        #     print("Input scale:", input_scale)
-        #     print("Input zero point:", input_zero_point)
-        #     image_np = (image_np / input_scale) + input_zero_point
-        #     image_np = np.around(image_np)
-        # print(image_np[10][10][2])
         self.interpreter.set_tensor(self.input_details["index"], input_np)
         self.interpreter.invoke()
         
         out = classify.get_classes(self.interpreter, top_k=1)
-        #output_data = self.interpreter.tensor(self.output_details['index'])().flatten()
-        #print(output_data) #[0 255]
-        #print(out)
-        #out = []
+
         tpu_objects_msg = tpu_objects()
         
         if out and len(out) == 1:
@@ -107,21 +101,15 @@ class image_feature:
         fps = 1/(t2-t1)
         fps_str = 'FPS = %.2f' % fps
         image_np = cv2.putText(image_np, fps_str, (10,60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 1)
-        
-        #draw.text((10,40), fps_str , fill='green')
 
         #### Create CompressedIamge ####
         msg = CompressedImage()
         msg.header.stamp = rospy.Time.now()
         msg.format = "jpeg"
-        #prepimg.save(fileIO,'jpeg')
-        #msg.data = np.array(fileIO.getvalue()).tostring()
-        #prepimg = prepimg.resize(self.size, Image.ANTIALIAS)
-        #open_cv_image = np.array(prepimg) 
+
         open_cv_image = image_np[:, :, ::-1].copy() 
         msg.data = np.array(cv2.imencode('.jpg', open_cv_image)[1]).tostring()
-        #msg.data = np.array(cv2.imencode('.jpg', image_np)[1]).tostring()
-        # Publish new image
+
         self.image_pub.publish(msg)
         self.tpu_objects_pub.publish(tpu_objects_msg)
         

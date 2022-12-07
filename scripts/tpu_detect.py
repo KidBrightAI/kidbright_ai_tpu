@@ -21,42 +21,38 @@ from geometry_msgs.msg import Twist
 from kidbright_tpu.msg import tpu_object
 from kidbright_tpu.msg import tpu_objects
 
+#YOLO
+from decoder import YoloDecoder
+from box import to_minmax
+
 VERBOSE=False
 
 class image_feature:
 
     def __init__(self, path):
         '''Initialize ros publisher, ros subscriber'''
-        self.font_path = "/home/pi/python/cascadia_font/CascadiaCode-Regular-VTT.ttf"
-        self.font = ImageFont.truetype(self.font_path, 15)
-        
-        #self.engine = DetectionEngine('/home/pi/customModels/output_tflite_graph_edgetpu-3.tflite')
-        #self.engine = DetectionEngine('/home/pi/customModels/output_tflite_ssd_v2_corrected_graph_edgetpu-1000.tflite')
-        #self.engine = DetectionEngine(path + '/model.tflite')
-        self.labels = read_label_file(path + '/labels.txt') 
-        self.interpreter = make_interpreter(path + '/model.tflite')
+        self.labels = read_label_file(path + '/output/labels.txt')
+        self.anchors = path + "/output/anchors.txt"
+        self.interpreter = make_interpreter(path + '/output/YOLO_best_mAP_edgetpu.tflite')
         self.interpreter.allocate_tensors()
-        #self.engine = DetectionEngine('/home/pi/customModels/exampleRobot/output_tflite_graph_edgetpu.tflite')
+        self.input_details = self.interpreter.get_input_details()[0]
+        _, self.input_height, self.input_width, _ = self.input_details['shape']
+        self.output_details = self.interpreter.get_output_details()[0]
         
-        #self.labels = self.ReadLabelFile('/home/pi/customModels/totoro_label.txt') 
-
-        #self.engine = DetectionEngine('/home/pi/TPU-MobilenetSSD/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite')
-        #self.labels = self.ReadLabelFile('/home/pi/TPU-MobilenetSSD/coco_labels.txt') 
-        #self.labels = self.ReadLabelFile(path + '/labels.txt') 
-        # self.labels = self.ReadLabelFile('/home/pi/customModels/exampleRobot/exampleRobot_labels.txt') 
+        #YOLO 
+        self.decoder = YoloDecoder(self.anchors)
         
-        
+        #Publish
         self.image_pub = rospy.Publisher("/output/image_detected/compressed", CompressedImage, queue_size = 5, tcp_nodelay=False)
-        # self.bridge = CvBridge()
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
-
-        # subscribed Topic
+        #Subscribe
         self.subscriber = rospy.Subscriber("/output/image_raw/compressed", CompressedImage, self.callback,  queue_size = 5, tcp_nodelay=False)
 
-        self.velocity_publisher = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
         self.vel_msg = Twist()
         rospy.init_node('image_feature', anonymous=False)
 
+    def ReadAnchorFile(self, file_path):
+        return []
 
     def ReadLabelFile(self, file_path):
         with open(file_path, 'r') as f:
@@ -73,29 +69,58 @@ class image_feature:
         area = width*height
         c_x = box[0] + width/2
         c_y = box[3] + height/2
-    def callback(self, ros_data):
-        '''Callback function of subscribed topic. 
-        Here images get converted and features detected'''
+    
+    def bbox_to_xy(self,boxes,w,h):
+        #height, width = image.shape[:2]
+        minmax_boxes = to_minmax(boxes)
+        minmax_boxes[:,0] *= w
+        minmax_boxes[:,2] *= w
+        minmax_boxes[:,1] *= h
+        minmax_boxes[:,3] *= h
+        return minmax_boxes.astype(np.int)
 
-        #fileIO = io.BytesIO()
-        #### direct conversion to CV2 ####
-        np_arr = np.frombuffer(ros_data.data, np.uint8)
-        #image_np = cv2.imdecode(np_arr, cv2.CV_LOAD_IMAGE_COLOR)
-        image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR) # OpenCV >= 3.0:
-        
-        #### Feature detectors using CV2 #### 
-        # "","Grid","Pyramid" + 
-        # "FAST","GFTT","HARRIS","MSER","ORB","SIFT","STAR","SURF"
-        prepimg = image_np[:, :, ::-1].copy()
-        prepimg = Image.fromarray(prepimg)
-        draw = ImageDraw.Draw(prepimg)
-        #print("Hello detect !!!!")
+    def draw_boxes(self, image, boxes, probs, labels):
+        for box, classes in zip(boxes, probs):
+            x1, y1, x2, y2 = box
+            cv2.rectangle(image, (x1,y1), (x2,y2), (0,255,0), 3)
+            cv2.putText(image, 
+                        '{}:  {:.2f}'.format(labels[np.argmax(classes)], classes.max()), 
+                        (x1, y1 - 13), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 
+                        1e-3 * image.shape[0], 
+                        (0,0,255), 1)
+        return image        
+
+
+
+    def callback(self, ros_data):
         t1 = time.time()
-        size = common.input_size(self.interpreter)
         
-        image = prepimg.convert('RGB')
-        _, scale = common.set_resized_input(self.interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
+        np_arr = np.frombuffer(ros_data.data, np.uint8)
+        image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR) # OpenCV >= 3.0:
+        image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB) 
+
+        input_np = cv2.resize(image_np.copy(), (self.input_width, self.input_height))
+        input_np = np.expand_dims(image_np, 0)
+
+        self.interpreter.set_tensor(self.input_details["index"], input_np)
         self.interpreter.invoke()
+        
+        output_data = self.interpreter.tensor(self.output_details['index'])().flatten()
+        boxes, probs = decoder.run(netout, threshold)
+        if len(boxes) > 0:
+            boxes = bbox_to_xy(boxes,image.shape[1],image.shape[0])
+            if self.labels:
+                text = f"{self.labels[obj.id]} {obj.score:0.2f} {c_x:.2f} {area:.2f}"
+                    
+                tpu_object_m = tpu_object()
+                tpu_object_m.cx = c_x
+                tpu_object_m.cy = c_y
+                tpu_object_m.width = width
+                tpu_object_m.height = height
+                tpu_object_m.label = self.labels[obj.id]
+                tpu_objects_msg.tpu_objects.append(tpu_object_m)
+                
         out = detect.get_objects(self.interpreter, 0.6, scale)
         tpu_objects_msg = tpu_objects()
         #print(out)
