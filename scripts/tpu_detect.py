@@ -4,13 +4,13 @@ import numpy as np
 import cv2
 import io
 import json
+import os
 
 import roslib
 import rospy
 
 from pycoral.adapters import common
 from pycoral.adapters import detect
-from pycoral.utils.dataset import read_label_file
 from pycoral.utils.edgetpu import make_interpreter
 
 from PIL import Image
@@ -30,13 +30,16 @@ VERBOSE=False
 
 class image_feature:
 
-    def __init__(self, path):
+    def __init__(self, path, threshold = 0.5):
         '''Initialize ros publisher, ros subscriber'''
-        path = "/home/pi/kbai-server/inferences/yolo"
-        self.threshold = 0.5
-        self.labels = read_label_file(path + '/output/labels.txt')
-        self.anchors = self.ReadAnchorFile(path + "/output/anchors.txt")
-        self.interpreter = make_interpreter(path + '/output/pretrained_model_edgetpu.tflite')
+        # path = "/home/pi/kbai-server/inferences/yolo"
+        self.threshold = threshold
+        self.labels = self.read_label_file(path + '/labels.txt')
+        
+        project_json = self.read_json_file(path + "/project.json")
+        self.anchors = project_json["project"]["project"]["anchors"]
+
+        self.interpreter = make_interpreter(path + '/model_edgetpu.tflite')
         self.interpreter.allocate_tensors()
         self.input_details = self.interpreter.get_input_details()[0]
         _, self.input_height, self.input_width, _ = self.input_details['shape']
@@ -56,11 +59,16 @@ class image_feature:
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
         #Subscribe
         self.subscriber = rospy.Subscriber("/output/image_raw/compressed", CompressedImage, self.callback,  queue_size = 5, tcp_nodelay=False)
+    
+    def read_json_file(self, file):
+        if os.path.exists(file):
+            with open(file) as f:
+                return json.load(f)
 
-    def ReadAnchorFile(self, file_path):
+    def read_label_file(self, file_path):
         with open(file_path,'r') as f:
             line = f.readlines()
-            return json.loads(line[0])
+            return line[0].split(",")
         return False
     
     def bbox_to_xy(self,boxes,w,h):
@@ -103,7 +111,7 @@ class image_feature:
                         "{}:  {:.2f}".format(self.labels[target_class_index], classes[target_class_index]), 
                         (x1, y1 - 13), 
                         cv2.FONT_HERSHEY_SIMPLEX, 
-                        0.003 * image_np.shape[0], 
+                        0.002 * image_np.shape[0], 
                         (255,0,0), 
                         1)
                     tpu_object_m = tpu_object()
