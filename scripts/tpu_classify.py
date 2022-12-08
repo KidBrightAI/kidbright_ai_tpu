@@ -32,8 +32,8 @@ class image_feature:
 
     def __init__(self, path):
         # topic where we publish
-        self.labels = read_label_file(path + '/output/labels.txt') 
-        self.interpreter = make_interpreter(path + '/output/Classifier_best_val_accuracy_edgetpu.tflite')
+        self.labels = read_label_file(path + '/labels.txt') 
+        self.interpreter = make_interpreter(path + '/model_edgetpu.tflite')
         self.interpreter.allocate_tensors()
         self.input_details = self.interpreter.get_input_details()[0]
         _, self.input_height, self.input_width, _ = self.input_details['shape']
