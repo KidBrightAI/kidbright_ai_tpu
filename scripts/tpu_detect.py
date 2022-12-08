@@ -3,6 +3,7 @@ import sys, time
 import numpy as np
 import cv2
 import io
+import json
 
 import roslib
 import rospy
@@ -31,67 +32,44 @@ class image_feature:
 
     def __init__(self, path):
         '''Initialize ros publisher, ros subscriber'''
+        path = "/home/pi/kbai-server/inferences/yolo"
+        self.threshold = 0.5
         self.labels = read_label_file(path + '/output/labels.txt')
-        self.anchors = path + "/output/anchors.txt"
-        self.interpreter = make_interpreter(path + '/output/YOLO_best_mAP_edgetpu.tflite')
+        self.anchors = self.ReadAnchorFile(path + "/output/anchors.txt")
+        self.interpreter = make_interpreter(path + '/output/pretrained_model_edgetpu.tflite')
         self.interpreter.allocate_tensors()
         self.input_details = self.interpreter.get_input_details()[0]
         _, self.input_height, self.input_width, _ = self.input_details['shape']
         self.output_details = self.interpreter.get_output_details()[0]
+        self.output_scale = self.output_details["quantization_parameters"]["scales"][0]
+        self.output_zero_points = self.output_details["quantization_parameters"]["zero_points"][0]
         
         #YOLO 
-        self.decoder = YoloDecoder(self.anchors)
+        if self.anchors:
+            self.decoder = YoloDecoder(self.anchors)
         
+        #Init Node
+        rospy.init_node('image_feature', anonymous=False)
+
         #Publish
         self.image_pub = rospy.Publisher("/output/image_detected/compressed", CompressedImage, queue_size = 5, tcp_nodelay=False)
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
         #Subscribe
         self.subscriber = rospy.Subscriber("/output/image_raw/compressed", CompressedImage, self.callback,  queue_size = 5, tcp_nodelay=False)
 
-        self.vel_msg = Twist()
-        rospy.init_node('image_feature', anonymous=False)
-
     def ReadAnchorFile(self, file_path):
-        return []
-
-    def ReadLabelFile(self, file_path):
-        with open(file_path, 'r') as f:
-            lines = f.readlines()
-        ret = {}
-        for line in lines:
-            pair = line.strip().split(maxsplit=1)
-            ret[int(pair[0])] = pair[1].strip()
-        return ret
-
-    def getObjectFeatures(self, box):
-        width = box[2]-box[0]
-        height = box[3]-box[1]
-        area = width*height
-        c_x = box[0] + width/2
-        c_y = box[3] + height/2
+        with open(file_path,'r') as f:
+            line = f.readlines()
+            return json.loads(line[0])
+        return False
     
     def bbox_to_xy(self,boxes,w,h):
-        #height, width = image.shape[:2]
         minmax_boxes = to_minmax(boxes)
         minmax_boxes[:,0] *= w
         minmax_boxes[:,2] *= w
         minmax_boxes[:,1] *= h
         minmax_boxes[:,3] *= h
-        return minmax_boxes.astype(np.int)
-
-    def draw_boxes(self, image, boxes, probs, labels):
-        for box, classes in zip(boxes, probs):
-            x1, y1, x2, y2 = box
-            cv2.rectangle(image, (x1,y1), (x2,y2), (0,255,0), 3)
-            cv2.putText(image, 
-                        '{}:  {:.2f}'.format(labels[np.argmax(classes)], classes.max()), 
-                        (x1, y1 - 13), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 
-                        1e-3 * image.shape[0], 
-                        (0,0,255), 1)
-        return image        
-
-
+        return minmax_boxes.astype(int)
 
     def callback(self, ros_data):
         t1 = time.time()
@@ -100,89 +78,57 @@ class image_feature:
         image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR) # OpenCV >= 3.0:
         image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB) 
 
-        input_np = cv2.resize(image_np.copy(), (self.input_width, self.input_height))
-        input_np = np.expand_dims(image_np, 0)
-
+        input_np = cv2.resize(image_np.copy(), (self.input_width, self.input_height)) #shape = 224,320,3
+        input_np = np.expand_dims(input_np, 0) #shape 
         self.interpreter.set_tensor(self.input_details["index"], input_np)
         self.interpreter.invoke()
         
-        output_data = self.interpreter.tensor(self.output_details['index'])().flatten()
-        boxes, probs = decoder.run(netout, threshold)
-        if len(boxes) > 0:
-            boxes = bbox_to_xy(boxes,image.shape[1],image.shape[0])
-            if self.labels:
-                text = f"{self.labels[obj.id]} {obj.score:0.2f} {c_x:.2f} {area:.2f}"
-                    
-                tpu_object_m = tpu_object()
-                tpu_object_m.cx = c_x
-                tpu_object_m.cy = c_y
-                tpu_object_m.width = width
-                tpu_object_m.height = height
-                tpu_object_m.label = self.labels[obj.id]
-                tpu_objects_msg.tpu_objects.append(tpu_object_m)
-                
-        out = detect.get_objects(self.interpreter, 0.6, scale)
+        #output_data = self.interpreter.tensor(self.output_details['index'])() #shape = 1, 7, 10, 35
+        
+        netout = self.interpreter.get_tensor(self.output_details['index']).astype(np.float32)
+        netout = (netout - self.output_zero_points) * self.output_scale
+        netout = netout.reshape(7, 10, 5, 7)
+        
+        boxes, probs = self.decoder.run(netout, self.threshold)
+
         tpu_objects_msg = tpu_objects()
-        #print(out)
-        if out:
-            for obj in out:
-                #print ('-----------------------------------------')
-                #if labels:
-                #    print(labels[obj.label_id])
-                #print ('score = ', obj.score)
-                bbox = obj.bbox
-                #print ('box = ', box)
-                # Draw a rectangle.
-                
-                width = bbox.xmax - bbox.xmin
-                height = bbox.ymax - bbox.ymin
-                area = width*height
-                c_x = bbox.xmin + width/2
-                c_y = bbox.ymin + height/2
-
-                draw.ellipse((c_x-5, c_y-5, c_x+5, c_y+5), fill = 'blue', outline ='blue')
-                if self.labels:
-                    vbal = f"{self.labels[obj.id]} {obj.score:0.2f} {c_x:.2f} {area:.2f}"
-                    #vbal = f"{self.labels[obj.label_id]} {box[0]} {box[1]} {box[2]} {box[3]}"
-                    
-                    
-                    draw.text((bbox.xmin, bbox.xmin), vbal, font=self.font, fill='green')
-                    draw.rectangle([(bbox.xmin, bbox.ymin), (bbox.xmax, bbox.ymax)], outline='green')
-                        
+        if len(boxes) > 0:
+            boxes = self.bbox_to_xy(boxes,image_np.shape[1],image_np.shape[0])
+            if self.labels:
+                for box, classes in zip(boxes, probs):
+                    x1, y1, x2, y2 = box
+                    target_class_index = np.argmax(classes)
+                    cv2.rectangle(image_np, (x1,y1), (x2,y2), (0,255,0), 3)
+                    cv2.putText(image_np, 
+                        "{}:  {:.2f}".format(self.labels[target_class_index], classes[target_class_index]), 
+                        (x1, y1 - 13), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 
+                        0.003 * image_np.shape[0], 
+                        (255,0,0), 
+                        1)
                     tpu_object_m = tpu_object()
-                    tpu_object_m.cx = c_x
-                    tpu_object_m.cy = c_y
-                    tpu_object_m.width = width
-                    tpu_object_m.height = height
-                    tpu_object_m.label = self.labels[obj.id]
+                    tpu_object_m.cx = (x2 - x1) / 2
+                    tpu_object_m.cy = (y2 - y1) / 2
+                    tpu_object_m.width = x2 - x1
+                    tpu_object_m.height = y2 - y1
+                    tpu_object_m.label = self.labels[target_class_index]
+                    tpu_object_m.confident = classes[target_class_index]
                     tpu_objects_msg.tpu_objects.append(tpu_object_m)
-
-                
-
-  
-                    #draw.text((box[0] + (box[2]-box[0]), box[1]), self.labels[obj.label_id] , fill='green')
-            
+                    
         t2 = time.time()
         fps = 1/(t2-t1)
         fps_str = 'FPS = %.2f' % fps
-        draw.text((10,220), fps_str , fill='green')
+        image_np = cv2.putText(image_np, fps_str, (10,20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 1)
 
-        #### Create CompressedIamge ####
+        # #### Create CompressedIamge ####
         msg = CompressedImage()
         msg.header.stamp = rospy.Time.now()
         msg.format = "jpeg"
-        #prepimg.save(fileIO,'jpeg')
-        #msg.data = np.array(fileIO.getvalue()).tostring()
-        open_cv_image = np.array(prepimg) 
-        open_cv_image = open_cv_image[:, :, ::-1].copy() 
-        msg.data = np.array(cv2.imencode('.jpg', open_cv_image)[1]).tostring()
-        #msg.data = np.array(cv2.imencode('.jpg', image_np)[1]).tostring()
-        # Publish new image
+        open_cv_image = image_np[:, :, ::-1].copy() 
+        msg.data = np.array(cv2.imencode('.jpg', open_cv_image)[1]).tobytes()
+        
         self.image_pub.publish(msg)
         self.tpu_objects_pub.publish(tpu_objects_msg)
-
-        
-        #self.subscriber.unregister()
 
 def main(path):
     '''Initializes and cleanup ros node'''
