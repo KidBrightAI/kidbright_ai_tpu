@@ -22,9 +22,6 @@ from pycoral.adapters import common
 from pycoral.utils.dataset import read_label_file
 from pycoral.utils.edgetpu import make_interpreter
 
-#YOLO
-from decoder import YoloDecoder
-from box import to_minmax
 
 VERBOSE=False
 
@@ -38,9 +35,6 @@ class image_feature:
         self.input_details = self.interpreter.get_input_details()[0]
         _, self.input_height, self.input_width, _ = self.input_details['shape']
         self.output_details = self.interpreter.get_output_details()[0]
-
-        #YOLO 
-        self.decoder = YoloDecoder(anchor)
 
         # To publish topic
         self.image_pub = rospy.Publisher("/output/image_detected/compressed", CompressedImage, queue_size = 5, tcp_nodelay=False)
