@@ -35,13 +35,13 @@ class image_feature:
         self.input_details = self.interpreter.get_input_details()[0]
         _, self.input_height, self.input_width, _ = self.input_details['shape']
         self.output_details = self.interpreter.get_output_details()[0]
+        
+        #Init Node
+        rospy.init_node('image_class', anonymous=False)
 
         # To publish topic
         self.image_pub = rospy.Publisher("/output/image_detected/compressed", CompressedImage, queue_size = 5, tcp_nodelay=False)
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
-
-        #Init Node
-        rospy.init_node('image_class', anonymous=False)
 
         # subscribed Topic
         self.subscriber = rospy.Subscriber("/output/image_raw/compressed", CompressedImage, self.callback,  queue_size = 5, tcp_nodelay=False)
