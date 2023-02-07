@@ -3,6 +3,7 @@ import sys, time
 import numpy as np
 import cv2
 import io
+import json
 
 import roslib
 import rospy
@@ -54,8 +55,17 @@ class image_feature:
         self.size = 320, 240
         
     def load_labels(self, filename):
-        with open(filename, 'r') as f:
-            return [line.strip() for line in f.readlines()]
+        if os.path.exists(filename):
+            with open(filename, 'r') as f:
+                return [line.strip() for line in f.readlines()]
+        else:
+            #parse label from project.json
+            project_json = os.path.join(os.path.dirname(filename), "project.json")
+            with open(project_json, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                labels = data["project"]["project"]["modelLabel"]
+                print("Project Label : ", ",".join(labels))
+                return labels
 
     def preprocess(self, img):
         
