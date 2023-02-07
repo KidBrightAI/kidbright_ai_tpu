@@ -86,12 +86,13 @@ class image_feature:
 
         # resize image
         input_np = cv2.resize(image_np.copy(), (self.input_width, self.input_height))
+        input_np = self.preprocess(input_np)
         input_np = np.expand_dims(input_np, 0)
 
         self.interpreter.set_tensor(self.input_details["index"], input_np)
         self.interpreter.invoke()
         
-        output_data = self.interpreter.get_tensor(self.output_details[0]['index'])
+        output_data = self.interpreter.get_tensor(self.output_details['index'])
         results = np.squeeze(output_data)
         out = results.argsort()[-1:][::-1]
 
