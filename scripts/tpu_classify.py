@@ -17,20 +17,26 @@ from geometry_msgs.msg import Twist
 from kidbright_tpu.msg import tpu_object
 from kidbright_tpu.msg import tpu_objects
 
-from pycoral.adapters import classify
-from pycoral.adapters import common
-from pycoral.utils.dataset import read_label_file
-from pycoral.utils.edgetpu import make_interpreter
-
+MODE = ""
+try:
+    from pycoral.adapters import classify
+    from pycoral.adapters import common
+    from pycoral.utils.edgetpu import make_interpreter
+except ImportError:
+    import tflite_runtime.interpreter as tflite
 
 VERBOSE=False
 
 class image_feature:
-
     def __init__(self, path):
         # topic where we publish
-        self.labels = read_label_file(path + '/labels.txt') 
-        self.interpreter = make_interpreter(path + '/model_edgetpu.tflite')
+        self.labels = self.load_labels(path + '/labels.txt') 
+        try:
+            self.interpreter = make_interpreter(path + '/model_edgetpu.tflite')
+            self.mode = "CORAL"
+        except:
+            self.interpreter = tflite.Interpreter(path + '/model_edgetpu.tflite')
+            self.mode = "LEGACY"
         self.interpreter.allocate_tensors()
         self.input_details = self.interpreter.get_input_details()[0]
         _, self.input_height, self.input_width, _ = self.input_details['shape']
@@ -47,7 +53,10 @@ class image_feature:
         self.subscriber = rospy.Subscriber("/output/image_raw/compressed", CompressedImage, self.callback,  queue_size = 5, tcp_nodelay=False)
         self.size = 320, 240
         
-  
+    def load_labels(self, filename):
+        with open(filename, 'r') as f:
+            return [line.strip() for line in f.readlines()]
+
     def preprocess(self, img):
         
         img = img.astype(np.float32)
@@ -72,14 +81,18 @@ class image_feature:
         self.interpreter.set_tensor(self.input_details["index"], input_np)
         self.interpreter.invoke()
         
-        out = classify.get_classes(self.interpreter, top_k=1)
+        output_data = self.interpreter.get_tensor(self.output_details[0]['index'])
+        results = np.squeeze(output_data)
+        out = results.argsort()[-1:][::-1]
+
+        #out = classify.get_classes(self.interpreter, top_k=1)
 
         tpu_objects_msg = tpu_objects()
         
         if out and len(out) == 1:
             if self.labels:
-                target_id = out[0].id
-                target_score = out[0].score
+                target_id = out[0]
+                target_score = results[out[0]]
                 target_label = self.labels[target_id]
                 text = f"{target_label} {target_score:0.2f}"
                 image_np = cv2.putText(image_np, text, (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 1)
