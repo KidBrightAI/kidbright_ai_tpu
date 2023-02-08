@@ -9,9 +9,12 @@ import os
 import roslib
 import rospy
 
-from pycoral.adapters import common
-from pycoral.adapters import detect
-from pycoral.utils.edgetpu import make_interpreter
+try:
+    from pycoral.adapters import common
+    from pycoral.adapters import detect
+    from pycoral.utils.edgetpu import make_interpreter
+except ImportError:
+    import tflite_runtime.interpreter as tflite
 
 from PIL import Image
 from PIL import ImageDraw

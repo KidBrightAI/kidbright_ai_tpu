@@ -18,7 +18,6 @@ from geometry_msgs.msg import Twist
 from kidbright_tpu.msg import tpu_object
 from kidbright_tpu.msg import tpu_objects
 
-MODE = ""
 try:
     from pycoral.adapters import classify
     from pycoral.adapters import common
@@ -100,7 +99,7 @@ class image_feature:
 
         tpu_objects_msg = tpu_objects()
         
-        if out and len(out) == 1:
+        if len(out) == 1:
             if self.labels:
                 target_id = out[0]
                 target_score = results[out[0]]
