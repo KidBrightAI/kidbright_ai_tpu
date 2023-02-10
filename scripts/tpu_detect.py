@@ -41,8 +41,13 @@ class image_feature:
         
         project_json = self.read_json_file(path + "/project.json")
         self.anchors = project_json["project"]["project"]["anchors"]
-
-        self.interpreter = make_interpreter(path + '/model_edgetpu.tflite')
+        try:
+            self.interpreter = make_interpreter(path + '/model_edgetpu.tflite')
+            self.mode = "CORAL"
+        except:
+            self.interpreter = tflite.Interpreter(path + '/model_edgetpu.tflite')
+            self.mode = "LEGACY"
+            
         self.interpreter.allocate_tensors()
         self.input_details = self.interpreter.get_input_details()[0]
         _, self.input_height, self.input_width, _ = self.input_details['shape']
