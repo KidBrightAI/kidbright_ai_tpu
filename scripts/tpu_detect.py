@@ -52,8 +52,12 @@ class image_feature:
         self.input_details = self.interpreter.get_input_details()[0]
         _, self.input_height, self.input_width, _ = self.input_details['shape']
         self.output_details = self.interpreter.get_output_details()[0]
-        self.output_scale = self.output_details["quantization_parameters"]["scales"][0]
-        self.output_zero_points = self.output_details["quantization_parameters"]["zero_points"][0]
+        try:
+            self.output_scale = self.output_details["quantization_parameters"]["scales"][0]
+            self.output_zero_points = self.output_details["quantization_parameters"]["zero_points"][0]
+            self.quantize = True
+        except:
+            self.quantize = False
         
         #YOLO 
         if self.anchors:
@@ -102,7 +106,8 @@ class image_feature:
         #output_data = self.interpreter.tensor(self.output_details['index'])() #shape = 1, 7, 10, 35
         
         netout = self.interpreter.get_tensor(self.output_details['index']).astype(np.float32)
-        netout = (netout - self.output_zero_points) * self.output_scale
+        if self.quantize:
+            netout = (netout - self.output_zero_points) * self.output_scale
         netout = netout.reshape(7, 10, 5, 7)
         
         boxes, probs = self.decoder.run(netout, self.threshold)

@@ -138,15 +138,6 @@ class inference():
 
                 self.snd_data.clear()
 
-       
-                
-                
-                
-
-                
-
-
-
 if __name__ == '__main__':
     print("hello meme")
     inference()
