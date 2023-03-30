@@ -132,6 +132,8 @@ class saveWave(object):
 #         self._action_server.publish_feedback(self._feedback)
 #         self.q.put(1)
 
+  def callback(self, msg):
+    print(len(msg.data))
 
   def execute_cb(self, goal):
     self.frame_counter = 0
@@ -139,7 +141,11 @@ class saveWave(object):
     self.record_started = False
     self.snd_data = []
 
+
+
     self.nFrame = goal.duration*FRAME_PER_SEC
+    self.projectName = goal.projectname
+
     print("Goal = ")
     print(goal)
     print(f"n frame : {self.nFrame}")
