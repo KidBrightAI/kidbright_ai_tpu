@@ -118,9 +118,11 @@ class saveWave(object):
                                     winfunc=np.hanning)
       mfccs = mfccs.transpose()
       plt.imshow(mfccs, cmap='inferno', origin='lower')
-      #buf = io.BytesIO()
-      #plt.savefig(buf, format='png')
-      #buf.seek(0)
+      buf = io.BytesIO()
+      plt.savefig(buf, format='png')
+      buf.seek(0)
+      #buf.read()
+      
       #plt.savefig(self.MFCCImageFileName)
       
       # with open("img.png", "rb") as image:
