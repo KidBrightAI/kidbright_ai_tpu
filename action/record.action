@@ -1,9 +1,13 @@
 #goal definition
-string projectname
+string projectid
 float32 duration
+float32 threshold
 ---
 #result definition
 string result
+int8[] wave
+int8[] mfcc
+int8[] waveform
 ---
 #feedback
 string status
