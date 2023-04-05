@@ -30,8 +30,7 @@ from queue import Queue
 class saveWave(object):
 
   _feedback = kidbright_tpu.msg.recordFeedback()
-  _result   = kidbright_tpu.msg.recordResult()
-
+  
   def __init__(self):
     rospy.init_node('save_wave_action')
     self._action_name = rospy.get_name()
@@ -94,15 +93,23 @@ class saveWave(object):
       rospy.sleep(0.1)
     
     record_result = self.q.get()
+
+    _result = kidbright_tpu.msg.recordResult()
+
     if record_result == 1:
       # save wav
-      wavefile = wave.open(self.fileName,'w')
+      wavefile = wave.open("__voice.wav", 'w')
       wavefile.setnchannels(1) # mono
       wavefile.setsampwidth(2)
       wavefile.setframerate(self.sampleRate)
       wavefile.writeframesraw(self.snd_data)
       wavefile.close()
-
+      with open("__voice.wav", "rb") as wav:
+        f = wav.read()
+        b = bytearray(f)
+        
+        _result.wave = b
+      
       # create mfcc
       print('Number of frames recorded: ' + str(len(self.snd_data)))
       mfccs = python_speech_features.base.mfcc(np.array(self.snd_data), 
@@ -121,7 +128,8 @@ class saveWave(object):
       buf = io.BytesIO()
       plt.savefig(buf, format='png')
       buf.seek(0)
-      #buf.read()
+
+      _result.mfcc = buf.read()
       
       #plt.savefig(self.MFCCImageFileName)
       
