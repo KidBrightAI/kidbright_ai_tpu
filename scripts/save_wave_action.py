@@ -191,11 +191,13 @@ class saveWave(object):
     self._as.publish_feedback(self._feedback)
     timeout = time.time() + 15
     while self.q.empty():
+        print("tick")
         if time.time() > timeout:
+            print("timeout")
             break
-        rospy.sleep(0.1)
+        rospy.sleep(1)
     rr = self.q.get()
-      
+    print("res")
     
     if rr == 1:
         self._result.result = "Done"

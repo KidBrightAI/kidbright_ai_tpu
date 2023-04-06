@@ -34,6 +34,18 @@ def is_silent(snd_data, pub, thres):
     pub.publish(volume_norm)
     return volume_norm < thres
 
+def find_device():
+    p = pyaudio.PyAudio()
+    max_devs = p.get_device_count()
+    device_index = -1
+    for i in range(max_devs):
+        devinfo = p.get_device_info_by_index(i)
+        if "USB Audio Device" in devinfo['name']:
+            device_index = int(devinfo['index'])
+            break
+    p.close()
+    return device_index
+
 def audio_node():
     pub_a = rospy.Publisher('a1', String, queue_size=10)
     pub_aint = rospy.Publisher('audio_int', int1d, queue_size=10)
@@ -41,18 +53,16 @@ def audio_node():
 
     rospy.init_node('audio_stream', anonymous=False) # singleton only audio stream can publish audio
 
-    p = pyaudio.PyAudio()
-    max_devs = p.get_device_count()
+    device_index = -1
+    max_retry = 5
 
-    device_index = None
+    while device_index < 0 and max_retry > 0:
+        print(f"========= FIND DEVICE ({max_retry}) =======")
+        device_index = find_device()
+        max_retry = max_retry - 1
+        rospy.sleep(1)
 
-    for i in range(max_devs):
-        devinfo = p.get_device_info_by_index(i)
-        if "USB Audio Device" in devinfo['name']:
-            device_index = int(devinfo['index'])
-            break
-
-    if device_index == None:
+    if device_index < 0:
         print("====== NO USB RECORD DEVICE !!! - TERMINATE ======")
         return
 
@@ -66,6 +76,7 @@ def audio_node():
     print(f"Selected Device Max CH : {devinfo.get('maxInputChannels')}")
     print('=============================================')
     
+    p = pyaudio.PyAudio()
     stream = p.open(format=FORMAT, channels=N_CHANNEL, rate=SAMPLE_RATE,
         input=True, output=False, input_device_index=device_index,
         frames_per_buffer=CHUNK_SIZE)

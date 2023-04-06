@@ -28,8 +28,6 @@ MFCC_NUM = 16
 from queue import Queue
 
 class saveWave(object):
-
-  _feedback = kidbright_tpu.msg.recordFeedback()
   
   def __init__(self):
     rospy.init_node('save_wave_action')
@@ -41,6 +39,8 @@ class saveWave(object):
     self.frame_counter = 0
     self.snd_data = []
     #-------------------
+    self._feedback = recordFeedback()
+    print("start record action server")
     self._action_server.start()    
     # 44100*4/2205
 
@@ -73,10 +73,10 @@ class saveWave(object):
     self.frame_counter = 0
     self.record_started = False
     self.snd_data = []
-
+    print(f".............")
+    print(goal)
     self.nFrame = goal.duration*FRAME_PER_SEC
-    self.projectName = goal.projectname
-
+    self.projectid = goal.projectid
     print(f"n frame : {self.nFrame}")
 
     self.audio_sub = rospy.Subscriber("audio_int", kidbright_tpu.msg.int1d, self.callback, queue_size=4)
@@ -89,29 +89,30 @@ class saveWave(object):
     timeout = time.time() + TIMEOUT_SEC
     while self.q.empty():
       if time.time() > timeout:
+        self.q.put(0)
         break
       rospy.sleep(0.1)
     
     record_result = self.q.get()
-
-    _result = kidbright_tpu.msg.recordResult()
+    _result = recordResult()
 
     if record_result == 1:
-      # save wav
-      wavefile = wave.open("__voice.wav", 'w')
-      wavefile.setnchannels(1) # mono
-      wavefile.setsampwidth(2)
-      wavefile.setframerate(self.sampleRate)
-      wavefile.writeframesraw(self.snd_data)
-      wavefile.close()
-      with open("__voice.wav", "rb") as wav:
-        f = wav.read()
-        b = bytearray(f)
-        
-        _result.wave = b
       
-      # create mfcc
       print('Number of frames recorded: ' + str(len(self.snd_data)))
+      
+      # save wav
+      with io.BytesIO() as buffer:
+        # wavefile = wave.open("__voice.wav", 'w') -- if you want to save this file
+        with wave.open(buffer, 'wb') as wav_file:
+          wav_file.setnchannels(1) # mono
+          wav_file.setsampwidth(2)  # 16-bit audio
+          wav_file.setframerate(SAMPLE_RATE)
+          wav_file.writeframes(self.snd_data)
+        byte_array = bytearray(buffer.getvalue())
+        audio_str = base64.b64encode(audio_bytes)
+        _result.wav =  audio_str
+      
+      # # create mfcc
       mfccs = python_speech_features.base.mfcc(np.array(self.snd_data), 
                                     samplerate=self.sampleRate,
                                     winlen=0.256,
@@ -128,8 +129,8 @@ class saveWave(object):
       buf = io.BytesIO()
       plt.savefig(buf, format='png')
       buf.seek(0)
-
-      _result.mfcc = buf.read()
+      mfcc_str = base64.b64encode(buf)
+      _result.mfcc = mfcc_str
       
       #plt.savefig(self.MFCCImageFileName)
       
@@ -138,12 +139,11 @@ class saveWave(object):
       #   b = bytearray(f)
       #   print b[0]
 
-      #publish result
-      self._result.result = "SUCCESS"
+      _result.result = "SUCCESS"
     else:
-      self._result.result = "TIMEOUT"
-    
-    self._action_server.set_succeeded(self._result)
+      _result.result = "TIMEOUT"
+
+    self._action_server.set_succeeded(_result)
 
 if __name__ == '__main__':
   saveWave()

@@ -5,9 +5,9 @@ float32 threshold
 ---
 #result definition
 string result
-int8[] wave
-int8[] mfcc
-int8[] waveform
+string mfcc
+string wav
+string waveform
 ---
 #feedback
 string status
