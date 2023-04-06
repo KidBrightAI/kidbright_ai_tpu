@@ -18,6 +18,7 @@ import io
 from datetime import datetime
 import time
 import base64
+import struct
 
 SAMPLE_RATE = 44100
 THRESHOLD = 10 # in dB
@@ -45,14 +46,14 @@ class saveWave(object):
     # 44100*4/2205
 
   def is_silent(self, snd_data, thres):
-    frames = np.frombuffer(snd_data, dtype=snd_data.typecode).astype(np.float32)
+    frames = np.array(snd_data, dtype=np.int16).astype(np.float32)
     volume_norm = np.linalg.norm(frames/65536.0)*10
     return volume_norm < thres
   
   def callback(self, msg):
     # message data len = 2205
     self.frame_counter += 1
-    
+    print(f"tick : {self.frame_counter}")
     if self.is_silent(msg.data, THRESHOLD) == False:
       self.record_started = True
       self._feedback.status = "START_RECORD"
@@ -95,26 +96,30 @@ class saveWave(object):
     
     record_result = self.q.get()
     _result = recordResult()
-
+    all_result = []
+    
     if record_result == 1:
       
+      all_result.append("SUCCESS")
       print('Number of frames recorded: ' + str(len(self.snd_data)))
-      
+
       # save wav
       with io.BytesIO() as buffer:
-        # wavefile = wave.open("__voice.wav", 'w') -- if you want to save this file
         with wave.open(buffer, 'wb') as wav_file:
           wav_file.setnchannels(1) # mono
           wav_file.setsampwidth(2)  # 16-bit audio
           wav_file.setframerate(SAMPLE_RATE)
-          wav_file.writeframes(self.snd_data)
+          byte_array = bytearray(struct.pack('h' * len(self.snd_data), *self.snd_data))
+          wav_file.writeframes(byte_array)
+        
         byte_array = bytearray(buffer.getvalue())
-        audio_str = base64.b64encode(audio_bytes)
-        _result.wav =  audio_str
+        audio_str = base64.b64encode(byte_array).decode('ascii')
+        
+        all_result.append(audio_str)
       
-      # # create mfcc
+      # create mfcc
       mfccs = python_speech_features.base.mfcc(np.array(self.snd_data), 
-                                    samplerate=self.sampleRate,
+                                    samplerate=SAMPLE_RATE,
                                     winlen=0.256,
                                     winstep=0.050,
                                     numcep=MFCC_NUM,
@@ -129,20 +134,24 @@ class saveWave(object):
       buf = io.BytesIO()
       plt.savefig(buf, format='png')
       buf.seek(0)
-      mfcc_str = base64.b64encode(buf)
-      _result.mfcc = mfcc_str
+      mfcc_str = base64.b64encode(buf.read()).decode('ascii')
       
-      #plt.savefig(self.MFCCImageFileName)
+      all_result.append(mfcc_str)
+      #_result.mfcc = mfcc_str
       
-      # with open("img.png", "rb") as image:
-      #   f = image.read()
-      #   b = bytearray(f)
-      #   print b[0]
-
-      _result.result = "SUCCESS"
+      # create waveform
+      time_axis = np.arange(0, len(self.snd_data)) / SAMPLE_RATE
+      plt.plot(time_axis, self.snd_data)
+      buf_wavef = io.BytesIO()
+      plt.savefig(buf_wavef, format='png')
+      buf_wavef.seek(0)
+      waveform_str = base64.b64encode(buf_wavef.read()).decode('ascii')
+      all_result.append(waveform_str)
+      
     else:
-      _result.result = "TIMEOUT"
-
+      all_result.append("TIMEOUT")
+      
+    _result.result = "$".join(all_result)
     self._action_server.set_succeeded(_result)
 
 if __name__ == '__main__':

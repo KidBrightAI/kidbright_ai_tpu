@@ -24,7 +24,7 @@ CHUNK_SIZE = 2205
 FORMAT = pyaudio.paInt16
 SAMPLE_RATE = 44100
 N_CHANNEL = 1
-MAX_CHUNK = 15
+MAX_CHUNK = 50
 #===================================#
 
 
@@ -43,8 +43,7 @@ def find_device():
         if "USB Audio Device" in devinfo['name']:
             device_index = int(devinfo['index'])
             break
-    p.close()
-    return device_index
+    return device_index, devinfo
 
 def audio_node():
     pub_a = rospy.Publisher('a1', String, queue_size=10)
@@ -55,10 +54,11 @@ def audio_node():
 
     device_index = -1
     max_retry = 5
+    devinfo = None
 
     while device_index < 0 and max_retry > 0:
         print(f"========= FIND DEVICE ({max_retry}) =======")
-        device_index = find_device()
+        device_index, devinfo = find_device()
         max_retry = max_retry - 1
         rospy.sleep(1)
 

@@ -5,9 +5,9 @@ float32 threshold
 ---
 #result definition
 string result
-string mfcc
-string wav
-string waveform
+#string mfcc
+#string wav
+#string waveform
 ---
 #feedback
 string status
