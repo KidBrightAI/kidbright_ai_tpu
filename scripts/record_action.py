@@ -67,6 +67,7 @@ class saveWave(object):
       self.snd_data.extend(msg.data)
 
     if self.frame_counter >= self.nFrame:
+      print("Unsubscribe")
       self.audio_sub.unregister()
       self.q.put(1)
       
@@ -74,6 +75,7 @@ class saveWave(object):
     self.frame_counter = 0
     self.record_started = False
     self.snd_data = []
+    self.q.queue.clear()
     print(f".............")
     print(goal)
     self.nFrame = goal.duration*FRAME_PER_SEC
@@ -91,6 +93,7 @@ class saveWave(object):
     while self.q.empty():
       if time.time() > timeout:
         self.q.put(0)
+        self.audio_sub.unregister()
         break
       rospy.sleep(0.1)
     
