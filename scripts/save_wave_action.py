@@ -20,6 +20,9 @@ import time
 import base64
 import struct
 
+import scipy.io.wavfile as wav
+
+
 SAMPLE_RATE = 44100
 THRESHOLD = 10 # in dB
 FRAME_PER_SEC = 20
@@ -72,6 +75,7 @@ class saveWave(object):
       self.q.put(1)
       
   def execute_cb(self, goal):
+    print("------------")
     self.frame_counter = 0
     self.record_started = False
     self.snd_data = []
@@ -107,21 +111,35 @@ class saveWave(object):
       print('Number of frames recorded: ' + str(len(self.snd_data)))
 
       # save wav
-      with io.BytesIO() as buffer:
-        with wave.open(buffer, 'wb') as wav_file:
-          wav_file.setnchannels(1) # mono
-          wav_file.setsampwidth(2)  # 16-bit audio
-          wav_file.setframerate(SAMPLE_RATE)
-          byte_array = bytearray(struct.pack('h' * len(self.snd_data), *self.snd_data))
-          wav_file.writeframes(byte_array)
+    #   with io.BytesIO() as buffer:
+    #     with wave.open(buffer, 'wb') as wav_file:
+    #       wav_file.setnchannels(1) # mono
+    #       wav_file.setsampwidth(2)  # 16-bit audio
+    #       wav_file.setframerate(SAMPLE_RATE)
+    #       byte_array = bytearray(struct.pack('h' * len(self.snd_data), *self.snd_data))
+    #       wav_file.writeframes(byte_array)
         
-        byte_array = bytearray(buffer.getvalue())
-        audio_str = base64.b64encode(byte_array).decode('ascii')
+    #     byte_array = bytearray(buffer.getvalue())
+    #     audio_str = base64.b64encode(byte_array).decode('ascii')
         
-        all_result.append(audio_str)
+    #     all_result.append(audio_str)
+      with wave.open("__audio.wav", 'wb') as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(SAMPLE_RATE)
+        byte_array = bytearray(struct.pack('h' * len(self.snd_data), *self.snd_data))
+        wav_file.writeframes(byte_array)
+      with wave.open("__audio.wav", 'rb') as f:
+        wav_bytes = f.read()
+      audio_str = base64.b64encode(wav_bytes).decode('ascii')
+      all_result.append(audio_str)
       
       # create mfcc
-      mfccs = python_speech_features.base.mfcc(np.array(self.snd_data), 
+      (rate,sig) = wav.read("__audio.wav")
+      # mfcc_feat = mfcc(sig,rate)
+      # fbank_feat = logfbank(sig,rate)
+      
+      mfccs = python_speech_features.base.mfcc(sig, 
                                     samplerate=SAMPLE_RATE,
                                     winlen=0.256,
                                     winstep=0.050,
@@ -133,6 +151,7 @@ class saveWave(object):
                                     appendEnergy=False,
                                     winfunc=np.hanning)
       mfccs = mfccs.transpose()
+      print(mfccs.shape)
       plt.imshow(mfccs, cmap='inferno', origin='lower')
       buf = io.BytesIO()
       plt.savefig(buf, format='png')
@@ -143,8 +162,7 @@ class saveWave(object):
       #_result.mfcc = mfcc_str
       
       # create waveform
-      time_axis = np.arange(0, len(self.snd_data)) / SAMPLE_RATE
-      plt.plot(time_axis, self.snd_data)
+      plt.plot(self.snd_data)
       buf_wavef = io.BytesIO()
       plt.savefig(buf_wavef, format='png')
       buf_wavef.seek(0)
