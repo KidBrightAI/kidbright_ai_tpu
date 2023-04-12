@@ -129,27 +129,27 @@ class saveWave(object):
         wav_file.setframerate(SAMPLE_RATE)
         byte_array = bytearray(struct.pack('h' * len(self.snd_data), *self.snd_data))
         wav_file.writeframes(byte_array)
-      with wave.open("__audio.wav", 'rb') as f:
+      with open("__audio.wav", 'rb') as f:
         wav_bytes = f.read()
       audio_str = base64.b64encode(wav_bytes).decode('ascii')
       all_result.append(audio_str)
       
       # create mfcc
       (rate,sig) = wav.read("__audio.wav")
-      # mfcc_feat = mfcc(sig,rate)
+      mfccs = mfcc(sig,rate)
       # fbank_feat = logfbank(sig,rate)
       
-      mfccs = python_speech_features.base.mfcc(sig, 
-                                    samplerate=SAMPLE_RATE,
-                                    winlen=0.256,
-                                    winstep=0.050,
-                                    numcep=MFCC_NUM,
-                                    nfilt=26,
-                                    nfft=2048,
-                                    preemph=0.0,
-                                    ceplifter=0,
-                                    appendEnergy=False,
-                                    winfunc=np.hanning)
+      # mfccs = python_speech_features.base.mfcc(sig, 
+      #                               samplerate=SAMPLE_RATE,
+      #                               winlen=0.256,
+      #                               winstep=0.050,
+      #                               numcep=MFCC_NUM,
+      #                               nfilt=26,
+      #                               nfft=2048,
+      #                               preemph=0.0,
+      #                               ceplifter=0,
+      #                               appendEnergy=False,
+      #                               winfunc=np.hanning)
       mfccs = mfccs.transpose()
       print(mfccs.shape)
       plt.figure()
