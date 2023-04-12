@@ -129,7 +129,7 @@ class saveWave(object):
         wav_file.setframerate(SAMPLE_RATE)
         byte_array = bytearray(struct.pack('h' * len(self.snd_data), *self.snd_data))
         wav_file.writeframes(byte_array)
-      with wave.open("__audio.wav", 'rb') as f:
+      with open("__audio.wav", 'rb') as f:
         wav_bytes = f.read()
       audio_str = base64.b64encode(wav_bytes).decode('ascii')
       all_result.append(audio_str)
