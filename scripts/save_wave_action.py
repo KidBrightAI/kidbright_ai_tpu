@@ -129,7 +129,7 @@ class saveWave(object):
         wav_file.setframerate(SAMPLE_RATE)
         byte_array = bytearray(struct.pack('h' * len(self.snd_data), *self.snd_data))
         wav_file.writeframes(byte_array)
-      with open("__audio.wav", 'rb') as f:
+      with wave.open("__audio.wav", 'rb') as f:
         wav_bytes = f.read()
       audio_str = base64.b64encode(wav_bytes).decode('ascii')
       all_result.append(audio_str)
@@ -152,6 +152,8 @@ class saveWave(object):
                                     winfunc=np.hanning)
       mfccs = mfccs.transpose()
       print(mfccs.shape)
+      plt.figure()
+      plt.axis('off')
       plt.imshow(mfccs, cmap='inferno', origin='lower')
       buf = io.BytesIO()
       plt.savefig(buf, format='png')
@@ -162,6 +164,7 @@ class saveWave(object):
       #_result.mfcc = mfcc_str
       
       # create waveform
+      plt.figure()
       plt.plot(self.snd_data)
       buf_wavef = io.BytesIO()
       plt.savefig(buf_wavef, format='png')
