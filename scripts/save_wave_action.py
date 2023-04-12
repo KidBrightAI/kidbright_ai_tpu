@@ -136,7 +136,7 @@ class saveWave(object):
       
       # create mfcc
       (rate,sig) = wav.read("__audio.wav")
-      mfccs = mfcc(sig,rate)
+      mfccs = python_speech_features.base.mfcc(sig,rate)
       # fbank_feat = logfbank(sig,rate)
       
       # mfccs = python_speech_features.base.mfcc(sig, 
