@@ -20,6 +20,8 @@ import time
 import base64
 import struct
 
+import librosa
+from PIL import Image, ImageDraw
 import scipy.io.wavfile as wav
 
 
@@ -52,7 +54,39 @@ class saveWave(object):
     frames = np.array(snd_data, dtype=np.int16).astype(np.float32)
     volume_norm = np.linalg.norm(frames/65536.0)*10
     return volume_norm < thres
-  
+
+  def draw_wave(self, snd_data, img_width = 700, img_height = 100):
+    rms = librosa.feature.rms(snd_data.astype(np.float32))
+    len_rms = rms.shape[1]
+    im = Image.new('RGB',(img_width, img_height),color="black")
+    draw = ImageDraw.Draw(im)
+    mx = img_width / len_rms
+    for x in range(len_rms):
+      v = int(rms[0][x])/100 + 2
+      y1 = (img_height - v) // 2
+      y2 = y1 + v
+      draw.rectangle([(x * mx , y1), (x * mx + mx, y2)], fill = "#FFA500",outline="#222")
+    return im
+
+  def draw_mfcc(self, snd_data, sr, img_width = 224, img_height = 224):
+    mfcc_feat = mfcc(snd_data, sr, 
+      nfft=2048,
+      winfunc=np.hanning
+    )
+	  canvas = (224,224)
+	  im = Image.new('RGBA', canvas, (255, 255, 255, 255))
+	  draw = ImageDraw.Draw(im)
+	  mx = 224 / mfcc_feat.shape[0]
+	  my = 224 / mfcc_feat.shape[1]
+    for x, mfcc_row in enumerate(mfcc_feat):
+      for y, mfcc_data in enumerate(mfcc_row):
+        mfcc_data = int(mfcc_data)
+        if mfcc_data >= 0:
+          draw.rectangle([(x * mx , y * my), (x * mx + mx, y * my + my)], fill = (100, mfcc_data * 10, 100, 255))
+        else:
+          draw.rectangle([(x * mx , y * my), (x * mx + mx, y * my + my)], fill = (100, 100, -mfcc_data * 10, 255))
+    return im
+
   def callback(self, msg):
     # message data len = 2205
     self.frame_counter += 1
@@ -80,7 +114,7 @@ class saveWave(object):
     self.record_started = False
     self.snd_data = []
     self.q.queue.clear()
-    print(f".............")
+    
     print(goal)
     self.nFrame = goal.duration*FRAME_PER_SEC
     self.projectid = goal.projectid
@@ -111,65 +145,32 @@ class saveWave(object):
       print('Number of frames recorded: ' + str(len(self.snd_data)))
 
       # save wav
-    #   with io.BytesIO() as buffer:
-    #     with wave.open(buffer, 'wb') as wav_file:
-    #       wav_file.setnchannels(1) # mono
-    #       wav_file.setsampwidth(2)  # 16-bit audio
-    #       wav_file.setframerate(SAMPLE_RATE)
-    #       byte_array = bytearray(struct.pack('h' * len(self.snd_data), *self.snd_data))
-    #       wav_file.writeframes(byte_array)
+      with io.BytesIO() as buffer:
+        with wave.open(buffer, 'wb') as wav_file:
+          wav_file.setnchannels(1) # mono
+          wav_file.setsampwidth(2)  # 16-bit audio
+          wav_file.setframerate(SAMPLE_RATE)
+          byte_array = bytearray(struct.pack('h' * len(self.snd_data), *self.snd_data))
+          wav_file.writeframes(byte_array)
         
-    #     byte_array = bytearray(buffer.getvalue())
-    #     audio_str = base64.b64encode(byte_array).decode('ascii')
-        
-    #     all_result.append(audio_str)
-      with wave.open("__audio.wav", 'wb') as wav_file:
-        wav_file.setnchannels(1)
-        wav_file.setsampwidth(2)
-        wav_file.setframerate(SAMPLE_RATE)
-        byte_array = bytearray(struct.pack('h' * len(self.snd_data), *self.snd_data))
-        wav_file.writeframes(byte_array)
-      with open("__audio.wav", 'rb') as f:
-        wav_bytes = f.read()
-      audio_str = base64.b64encode(wav_bytes).decode('ascii')
+        byte_array = bytearray(buffer.getvalue())
+        audio_str = base64.b64encode(byte_array).decode('ascii')
       all_result.append(audio_str)
-      
+
       # create mfcc
-      (rate,sig) = wav.read("__audio.wav")
-      #mfccs = python_speech_features.base.mfcc(sig,rate)
-      # fbank_feat = logfbank(sig,rate)
-      
-      mfccs = python_speech_features.base.mfcc(sig, 
-                                    samplerate=SAMPLE_RATE,
-                                    winlen=0.256,
-                                    winstep=0.050,
-                                    numcep=MFCC_NUM,
-                                    nfilt=26,
-                                    nfft=2048,
-                                    preemph=0.0,
-                                    ceplifter=0,
-                                    appendEnergy=False,
-                                    winfunc=np.hanning)
-      mfccs = mfccs.transpose()
-      print(mfccs.shape)
-      plt.figure()
-      plt.axis('off')
-      plt.imshow(mfccs, cmap='inferno', origin='lower')
-      buf = io.BytesIO()
-      plt.savefig(buf, format='png')
-      buf.seek(0)
-      mfcc_str = base64.b64encode(buf.read()).decode('ascii')
-      
+      im_mfcc = self.draw_mfcc(self.snd_data, SAMPLE_RATE)
+      with io.BytesIO() as buf_mfccf:
+        im_mfcc.save(buf_mfccf, format="JPG")
+        buf_mfccf.seek(0)
+        mfcc_str = base64.b64encode(buf_mfccf.read()).decode("ascii")
       all_result.append(mfcc_str)
-      #_result.mfcc = mfcc_str
-      
+
       # create waveform
-      plt.figure()
-      plt.plot(self.snd_data)
-      buf_wavef = io.BytesIO()
-      plt.savefig(buf_wavef, format='png')
-      buf_wavef.seek(0)
-      waveform_str = base64.b64encode(buf_wavef.read()).decode('ascii')
+      im_wav = self.draw_wave(self.snd_data)
+      with io.BytesIO() as buf_wavef:
+        im_wav.save(buf_wavef, format="JPG")
+        buf_wavef.seek(0)
+        waveform_str = base64.b64encode(buf_wavef.read()).decode('ascii')
       all_result.append(waveform_str)
       
     else:
