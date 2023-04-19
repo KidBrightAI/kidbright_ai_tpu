@@ -46,42 +46,94 @@ class image_feature:
         rospy.init_node('voice_class', anonymous=False)
 
         # To publish topic
-        self.image_pub = rospy.Publisher("/output/image_detected/compressed", CompressedImage, queue_size = 5, tcp_nodelay=False)
+        self.mfcc_pub = rospy.Publisher("/output/image_detected/compressed", CompressedImage, queue_size = 5, tcp_nodelay=False)
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
 
-        # subscribed Topic
-        self.audio_sub = rospy.Subscriber("audio_int", kidbright_tpu.msg.int1d, self.callback, queue_size=4)
-
-        self.subscriber = rospy.Subscriber("/a1", CompressedImage, self.callback,  queue_size = 5, tcp_nodelay=False)
         
+        # project info
+        self.nFrame = goal.duration*FRAME_PER_SEC
+        self.projectid = goal.projectid
+    
         self.size = 224, 224
         
-    def running(self):
-      pass
-    
+    def is_silent(self, snd_data, thres):
+        frames = np.array(snd_data, dtype=np.int16).astype(np.float32)
+        volume_norm = np.linalg.norm(frames/65536.0)*10
+        return volume_norm < thres
+
     def callback(self, msg):
-      # message data len = 2205
-      self.frame_counter += 1
-      print(f"tick : {self.frame_counter}")
-      if self.is_silent(msg.data, THRESHOLD) == False:
-        self.record_started = True
-        self._feedback.status = "START_RECORD"
-        self._action_server.publish_feedback(self._feedback)
+        # message data len = 2205
+        self.frame_counter += 1
+        print(f"tick : {self.frame_counter}")
+        if self.is_silent(msg.data, THRESHOLD) == False:
+            self.record_started = True
+            self._feedback.status = "START_RECORD"
+            self._action_server.publish_feedback(self._feedback)
 
-      if self.record_started and self.frame_counter % 20 == 0:
-        self._feedback.status = "RECORDING"
-        self._action_server.publish_feedback(self._feedback)
-      
-      if self.record_started:
-        self.snd_data.extend(msg.data)
+        if self.record_started and self.frame_counter % 20 == 0:
+            self._feedback.status = "RECORDING"
+            self._action_server.publish_feedback(self._feedback)
+        
+        if self.record_started:
+            self.snd_data.extend(msg.data)
 
-      if self.frame_counter >= self.nFrame:
-        print("Unsubscribe")
-        self.audio_sub.unregister()
-        self.q.put(1)
+        if self.frame_counter >= self.nFrame:
+            print("Unsubscribe")
+            self.audio_sub.unregister()
+            self.q.put(1)
     
+    def draw_mfcc(self, snd_data, sr, img_width = 224, img_height = 224):
+        mfcc_feat = mfcc(snd_data, sr, 
+            nfft=2048,
+            winfunc=np.hanning
+        )
+        canvas = (224,224)
+        im = Image.new('RGBA', canvas, (255, 255, 255, 255))
+        draw = ImageDraw.Draw(im)
+        mx = 224 / mfcc_feat.shape[0]
+        my = 224 / mfcc_feat.shape[1]
+        for x, mfcc_row in enumerate(mfcc_feat):
+            for y, mfcc_data in enumerate(mfcc_row):
+                mfcc_data = int(mfcc_data)
+                if mfcc_data >= 0:
+                    draw.rectangle([(x * mx , y * my), (x * mx + mx, y * my + my)], fill = (100, mfcc_data * 10, 100, 255))
+                else:
+                    draw.rectangle([(x * mx , y * my), (x * mx + mx, y * my + my)], fill = (100, 100, -mfcc_data * 10, 255))
+        return im
 
+    def running(self):
+        while not rospy.is_shutdown():
+            # wait for voice active
+            self.frame_counter = 0
+            self.record_started = False
+            self.snd_data = []
+            self.q.queue.clear()
+            print(f"start with n frame : {self.nFrame}")
+            
+            self.audio_sub = rospy.Subscriber("audio_int", kidbright_tpu.msg.int1d, self.callback, queue_size=4)
 
+            timeout = time.time() + TIMEOUT_SEC
+            while self.q.empty():
+                if time.time() > timeout:
+                    self.q.put(0)
+                    self.audio_sub.unregister()
+                    break
+                rospy.sleep(0.1)
+    
+            record_result = self.q.get()
+            if record_result == 1:
+                print('Number of frames recorded: ' + str(len(self.snd_data)))
+
+            # create mfcc
+            im_mfcc = self.draw_mfcc(self.snd_data, SAMPLE_RATE)
+            
+            # create waveform
+            im_wav = self.draw_wave(self.snd_data)
+            
+        else:
+            pass
+
+    
     def load_labels(self, filename):
         if os.path.exists(filename):
             with open(filename, 'r') as f:
