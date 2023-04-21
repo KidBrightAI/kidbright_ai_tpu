@@ -70,7 +70,7 @@ class saveWave(object):
     return im
 
   def draw_mfcc(self, snd_data, sr, img_width = 224, img_height = 224):
-    mfcc_feat = mfcc(snd_data, sr, nfft=2048, winfunc=np.hanning)
+    mfcc_feat = mfcc(np.array(snd_data), sr, nfft=2048, winfunc=np.hanning)
     canvas = (224,224)
     im = Image.new('RGBA', canvas, (255, 255, 255, 255))
     draw = ImageDraw.Draw(im)
