@@ -73,11 +73,11 @@ class saveWave(object):
       nfft=2048,
       winfunc=np.hanning
     )
-	  canvas = (224,224)
-	  im = Image.new('RGBA', canvas, (255, 255, 255, 255))
-	  draw = ImageDraw.Draw(im)
-	  mx = 224 / mfcc_feat.shape[0]
-	  my = 224 / mfcc_feat.shape[1]
+    canvas = (224,224)
+    im = Image.new('RGBA', canvas, (255, 255, 255, 255))
+    draw = ImageDraw.Draw(im)
+    mx = 224 / mfcc_feat.shape[0]
+    my = 224 / mfcc_feat.shape[1]
     for x, mfcc_row in enumerate(mfcc_feat):
       for y, mfcc_data in enumerate(mfcc_row):
         mfcc_data = int(mfcc_data)
