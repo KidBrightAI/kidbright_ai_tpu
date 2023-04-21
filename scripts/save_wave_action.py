@@ -158,7 +158,7 @@ class saveWave(object):
       # create mfcc
       im_mfcc = self.draw_mfcc(self.snd_data, SAMPLE_RATE)
       with io.BytesIO() as buf_mfccf:
-        im_mfcc.save(buf_mfccf, format="JPG")
+        im_mfcc.save(buf_mfccf, format="JPEG")
         buf_mfccf.seek(0)
         mfcc_str = base64.b64encode(buf_mfccf.read()).decode("ascii")
       all_result.append(mfcc_str)
@@ -166,7 +166,7 @@ class saveWave(object):
       # create waveform
       im_wav = self.draw_wave(self.snd_data)
       with io.BytesIO() as buf_wavef:
-        im_wav.save(buf_wavef, format="JPG")
+        im_wav.save(buf_wavef, format="JPEG")
         buf_wavef.seek(0)
         waveform_str = base64.b64encode(buf_wavef.read()).decode('ascii')
       all_result.append(waveform_str)
