@@ -56,23 +56,24 @@ class saveWave(object):
     return volume_norm < thres
 
   def draw_wave(self, snd_data, img_width = 700, img_height = 100):
-    rms = librosa.feature.rms(snd_data.astype(np.float32))
-    len_rms = rms.shape[1]
+    line_color = 180
+    rms_len = 128
+    section_len = len(snd_data) // rms_len
+    mx = img_width / rms_len
     im = Image.new('RGB',(img_width, img_height),color="black")
     draw = ImageDraw.Draw(im)
-    mx = img_width / len_rms
-    for x in range(len_rms):
-      v = int(rms[0][x])/100 + 2
-      y1 = (img_height - v) // 2
-      y2 = y1 + v
-      draw.rectangle([(x * mx , y1), (x * mx + mx, y2)], fill = "#FFA500",outline="#222")
+    for x in range(rms_len - 1):
+        st = x * section_len
+        sp = st + section_len
+        block_rms = np.sqrt(np.mean(snd_data[st:sp]**2))
+        v = int(block_rms)/100 + 2
+        y1 = (img_height - v) // 2
+        y2 = y1 + v
+        draw.rectangle([(x * mx , y1), (x * mx + mx, y2)], fill = "#FFA500",outline="#222")
     return im
 
   def draw_mfcc(self, snd_data, sr, img_width = 224, img_height = 224):
-    mfcc_feat = mfcc(snd_data, sr, 
-      nfft=2048,
-      winfunc=np.hanning
-    )
+    mfcc_feat = mfcc(snd_data, sr, nfft=2048, winfunc=np.hanning)
     canvas = (224,224)
     im = Image.new('RGBA', canvas, (255, 255, 255, 255))
     draw = ImageDraw.Draw(im)
