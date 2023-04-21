@@ -59,6 +59,7 @@ class saveWave(object):
     mx = img_width / rms_len
     im = Image.new('RGB',(img_width, img_height),color="black")
     draw = ImageDraw.Draw(im)
+    snd_data = np.array(snd_data)
     for x in range(rms_len - 1):
         st = x * section_len
         sp = st + section_len
