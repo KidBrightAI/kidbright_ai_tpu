@@ -101,14 +101,18 @@ class image_feature:
                     draw.rectangle([(x * mx , y * my), (x * mx + mx, y * my + my)], fill = (100, 100, -mfcc_data * 10, 255))
         return im
 
-    def running(self):
+    def running(self, project, threshold):
+        print(f"===========================")
+        print(f"project : {project}")
+        print(f"nframe : {project}")
+        print(f"threshold : {threshold}")
+        print(f"===========================")
         while not rospy.is_shutdown():
             # wait for voice active
             self.frame_counter = 0
             self.record_started = False
             self.snd_data = []
             self.q.queue.clear()
-            print(f"start with n frame : {self.nFrame}")
             
             self.audio_sub = rospy.Subscriber("audio_int", kidbright_tpu.msg.int1d, self.callback, queue_size=4)
 
@@ -127,8 +131,6 @@ class image_feature:
             # create mfcc
             im_mfcc = self.draw_mfcc(self.snd_data, SAMPLE_RATE)
             
-            # create waveform
-            im_wav = self.draw_wave(self.snd_data)
             
         else:
             pass
