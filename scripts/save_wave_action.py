@@ -3,7 +3,7 @@ import rospy
 import wave
 from std_msgs.msg import String
 import numpy as np
-import python_speech_features
+from python_speech_features import mfcc
 import matplotlib
 matplotlib.use('Agg') # to suppress plt.show()
 import matplotlib.pyplot as plt
