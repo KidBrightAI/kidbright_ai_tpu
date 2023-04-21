@@ -20,10 +20,7 @@ import time
 import base64
 import struct
 
-import librosa
 from PIL import Image, ImageDraw
-import scipy.io.wavfile as wav
-
 
 SAMPLE_RATE = 44100
 THRESHOLD = 10 # in dB
