@@ -72,7 +72,7 @@ class saveWave(object):
   def draw_mfcc(self, snd_data, sr, img_width = 224, img_height = 224):
     mfcc_feat = mfcc(np.array(snd_data), sr, nfft=2048, winfunc=np.hanning)
     canvas = (224,224)
-    im = Image.new('RGBA', canvas, (255, 255, 255, 255))
+    im = Image.new('RGB', canvas, (255, 255, 255))
     draw = ImageDraw.Draw(im)
     mx = 224 / mfcc_feat.shape[0]
     my = 224 / mfcc_feat.shape[1]
@@ -80,9 +80,9 @@ class saveWave(object):
       for y, mfcc_data in enumerate(mfcc_row):
         mfcc_data = int(mfcc_data)
         if mfcc_data >= 0:
-          draw.rectangle([(x * mx , y * my), (x * mx + mx, y * my + my)], fill = (100, mfcc_data * 10, 100, 255))
+          draw.rectangle([(x * mx , y * my), (x * mx + mx, y * my + my)], fill = (100, mfcc_data * 10, 100))
         else:
-          draw.rectangle([(x * mx , y * my), (x * mx + mx, y * my + my)], fill = (100, 100, -mfcc_data * 10, 255))
+          draw.rectangle([(x * mx , y * my), (x * mx + mx, y * my + my)], fill = (100, 100, -mfcc_data * 10))
     return im
 
   def callback(self, msg):
