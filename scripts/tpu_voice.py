@@ -60,6 +60,7 @@ class image_feature:
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
     
         self.size = 224, 224
+        self.running()
         
     def is_silent(self, snd_data, thres):
         frames = np.array(snd_data, dtype=np.int16).astype(np.float32)
@@ -132,7 +133,7 @@ class image_feature:
         out = results.argsort()[-1:][::-1]
         return out
         
-    def running(self, threshold):
+    def running(self):
         print(f"===========================")
         print(f"project : {self.project['project']['project']['id']}")
         print(f"nframe : {self.nFrame}")
@@ -183,7 +184,7 @@ class image_feature:
 
 
 if __name__ == '__main__':
-    ic = image_feature(sys.argv[1])
+    ic = image_feature(sys.argv[1], sys.argv[2])
     try:
         rospy.spin()
     except KeyboardInterrupt:
