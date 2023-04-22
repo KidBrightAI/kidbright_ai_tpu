@@ -134,7 +134,7 @@ class image_feature:
         
     def running(self, threshold):
         print(f"===========================")
-        print(f"project : {self.project["project"]["project"]["id"]}")
+        print(f"project : {self.project['project']['project']['id']}")
         print(f"nframe : {self.nFrame}")
         print(f"threshold : {self.threshold}")
         print(f"===========================")
