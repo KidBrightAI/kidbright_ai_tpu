@@ -166,8 +166,20 @@ class image_feature:
             record_result = self.q.get()
             if record_result == 1:
                 print('Number of frames recorded: ' + str(len(self.snd_data)))
+                
                 # create mfcc
                 im_mfcc = self.draw_mfcc(self.snd_data, SAMPLE_RATE)
+                
+                # pub mfcc 
+                img_msg = CompressedImage()
+                msg.header.stamp = rospy.Time.now()
+                msg.height = im_mfcc.height
+                msg.width = im_mfcc.width
+                msg.format = "jpeg"
+                msg.data = np.array(img_msg).tobytes()
+                self.mfcc_pub.publish(msg)
+                
+                #classify
                 out, results = self.classify(im_mfcc)
                 if len(out) == 1:
                     tpu_objects_msg = tpu_objects()
