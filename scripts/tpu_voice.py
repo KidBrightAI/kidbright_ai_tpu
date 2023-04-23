@@ -170,6 +170,8 @@ class image_feature:
                 
                 # create mfcc
                 im_mfcc = self.draw_mfcc(self.snd_data, SAMPLE_RATE)
+                #classify
+                out, results = self.classify(im_mfcc)
                 
                 # pub mfcc 
                 with io.BytesIO() as buf_mfccf:
@@ -178,8 +180,6 @@ class image_feature:
                     mfcc_str = base64.b64encode(buf_mfccf.read()).decode("ascii")
                 self.mfcc_pub.publish(mfcc_str)
                 
-                #classify
-                out, results = self.classify(im_mfcc)
                 if len(out) == 1:
                     tpu_objects_msg = tpu_objects()
                     print(out)
@@ -200,7 +200,7 @@ class image_feature:
                         tpu_object_m.confident = target_score
                         tpu_objects_msg.tpu_objects.append(tpu_object_m)
 
-                    self.tpu_objects_pub.publish(tpu_objects_msg)
+                        self.tpu_objects_pub.publish(tpu_objects_msg)
 
 if __name__ == '__main__':
     ic = image_feature(sys.argv[1], float(sys.argv[2]))
