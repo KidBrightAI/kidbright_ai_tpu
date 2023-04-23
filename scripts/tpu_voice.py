@@ -40,7 +40,7 @@ class image_feature:
     def __init__(self, path, threshold):
         # topic where we publish
         self.labels = self.load_labels(path + '/labels.txt') 
-        with open(path + 'project.json') as pjson:
+        with open(path + '/project.json') as pjson:
             self.project = json.load(pjson)
         self.nFrame = self.project["project"]["project"]["options"]["delay"] // 1000 * FRAME_PER_SEC
         self.threshold = threshold
