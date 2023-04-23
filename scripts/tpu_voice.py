@@ -173,8 +173,6 @@ class image_feature:
                 # pub mfcc 
                 img_msg = CompressedImage()
                 img_msg.header.stamp = rospy.Time.now()
-                img_msg.height = im_mfcc.height
-                img_msg.width = im_mfcc.width
                 img_msg.format = "jpeg"
                 img_msg.data = np.array(im_mfcc).tobytes()
                 self.mfcc_pub.publish(img_msg)
