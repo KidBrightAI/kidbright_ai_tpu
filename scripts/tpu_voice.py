@@ -17,6 +17,7 @@ from python_speech_features import mfcc
 # Ros Messages
 from sensor_msgs.msg import CompressedImage
 from geometry_msgs.msg import Twist
+import kidbright_tpu.msg
 from kidbright_tpu.msg import tpu_object
 from kidbright_tpu.msg import tpu_objects
 
