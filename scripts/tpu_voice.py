@@ -58,8 +58,12 @@ class image_feature:
         # To publish topic
         self.mfcc_pub = rospy.Publisher("/output/image_detected/compressed", CompressedImage, queue_size = 5, tcp_nodelay=False)
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
-    
+        
+        self.q = Queue()    
+        self.frame_counter = 0
+        self.snd_data = []
         self.size = 224, 224
+        
         self.running()
         
     def is_silent(self, snd_data, thres):
