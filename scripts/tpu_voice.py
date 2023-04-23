@@ -2,6 +2,7 @@
 import sys, time, os, io, json
 import numpy as np
 import cv2
+from queue import Queue
 
 import roslib
 import rospy
@@ -63,7 +64,7 @@ class image_feature:
         self.frame_counter = 0
         self.snd_data = []
         self.size = 224, 224
-        
+
         self.running()
         
     def is_silent(self, snd_data, thres):
