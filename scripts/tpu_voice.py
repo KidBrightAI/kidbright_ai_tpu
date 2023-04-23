@@ -200,7 +200,7 @@ class image_feature:
                         tpu_object_m.confident = target_score
                         tpu_objects_msg.tpu_objects.append(tpu_object_m)
 
-            self.tpu_objects_pub.publish(tpu_objects_msg)
+                    self.tpu_objects_pub.publish(tpu_objects_msg)
 
 if __name__ == '__main__':
     ic = image_feature(sys.argv[1], float(sys.argv[2]))
