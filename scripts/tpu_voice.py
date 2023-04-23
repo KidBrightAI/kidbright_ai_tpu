@@ -58,7 +58,7 @@ class image_feature:
         rospy.init_node('voice_class', anonymous=False)
 
         # To publish topic
-        self.mfcc_pub = rospy.Publisher("/output/image_detected/compressed", CompressedImage, queue_size = 5, tcp_nodelay=False)
+        self.mfcc_pub = rospy.Publisher("/output/image_detected/mfcc", CompressedImage, queue_size = 5, tcp_nodelay=False)
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
         
         self.q = Queue()    
