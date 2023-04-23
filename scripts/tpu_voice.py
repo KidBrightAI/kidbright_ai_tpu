@@ -60,7 +60,8 @@ class image_feature:
         # To publish topic
         self.mfcc_pub = rospy.Publisher("/output/image_detected/mfcc", CompressedImage, queue_size = 5, tcp_nodelay=False)
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
-        
+        self.status_pub = rospy.Publisher("/voice_class/status", String, queue_size=5,tcp_nodelay = False)
+
         self.q = Queue()    
         self.frame_counter = 0
         self.snd_data = []
@@ -98,6 +99,7 @@ class image_feature:
         # message data len = 2205
         if self.is_silent(msg.data, self.threshold) == False and self.record_started == False:
             print("start record")
+            self.status_pub.publish('START_RECORD')
             self.record_started = True
             
         if self.record_started:
@@ -107,6 +109,7 @@ class image_feature:
 
         if self.frame_counter >= self.nFrame:
             print("end record, unsubscribe")
+            self.status_pub.publish('END_RECORD')
             self.audio_sub.unregister()
             self.q.put(1)
     
@@ -154,12 +157,14 @@ class image_feature:
             self.q.queue.clear()
 
             self.audio_sub = rospy.Subscriber("audio_int", kidbright_tpu.msg.int1d, self.audio_callback, queue_size=4)
+            self.status_pub.publish('START')
 
             timeout = time.time() + TIMEOUT_SEC
             while self.q.empty():
                 if time.time() > timeout:
                     self.q.put(0)
                     self.audio_sub.unregister()
+                    self.status_pub.publish('TIME_OUT')
                     break
                 rospy.sleep(0.1)
     
@@ -183,6 +188,7 @@ class image_feature:
                     tpu_objects_msg = tpu_objects()
                     print(out)
                     print(results)
+                    self.status_pub.publish('CLASSIFY')
                     if self.labels:
                         target_id = out[0]
                         target_score = results[out[0]]
