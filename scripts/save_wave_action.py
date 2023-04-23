@@ -88,18 +88,19 @@ class saveWave(object):
 
   def callback(self, msg):
     # message data len = 2205
-    self.frame_counter += 1
-    print(f"tick : {self.frame_counter}")
-    if self.is_silent(msg.data, THRESHOLD) == False:
+    
+    if self.is_silent(msg.data, THRESHOLD) == False and self.record_started == False:
       self.record_started = True
       self._feedback.status = "START_RECORD"
       self._action_server.publish_feedback(self._feedback)
 
-    if self.record_started and self.frame_counter % 20 == 0:
+    if self.record_started and self.frame_counter % 10 == 0:
       self._feedback.status = "RECORDING"
       self._action_server.publish_feedback(self._feedback)
     
     if self.record_started:
+      self.frame_counter += 1
+      print(f"tick : {self.frame_counter}")
       self.snd_data.extend(msg.data)
 
     if self.frame_counter >= self.nFrame:

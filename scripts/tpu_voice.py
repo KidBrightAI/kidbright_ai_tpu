@@ -96,16 +96,17 @@ class image_feature:
 
     def audio_callback(self, msg):
         # message data len = 2205
-        self.frame_counter += 1
-        print(f"tick : {self.frame_counter}")
-        if self.is_silent(msg.data, self.threshold) == False:
+        if self.is_silent(msg.data, self.threshold) == False and self.record_started == False:
+            print("start record")
             self.record_started = True
             
         if self.record_started:
+            self.frame_counter += 1
+            print(f"tick : {self.frame_counter}")
             self.snd_data.extend(msg.data)
 
         if self.frame_counter >= self.nFrame:
-            print("Unsubscribe")
+            print("end record, unsubscribe")
             self.audio_sub.unregister()
             self.q.put(1)
     
@@ -126,19 +127,19 @@ class image_feature:
         return im
 
     def classify(self, im):
-        image_np = numpy.array(im) 
+        image_np = np.array(im) 
         input_np = cv2.resize(image_np.copy(), (self.input_width, self.input_height))
         input_np = self.preprocess(input_np)
         input_np = np.expand_dims(input_np, 0)
 
         self.interpreter.set_tensor(self.input_details["index"], input_np)
         self.interpreter.invoke()
-        
+
         output_data = self.interpreter.get_tensor(self.output_details['index'])
         results = np.squeeze(output_data)
         out = results.argsort()[-1:][::-1]
-        return out
-        
+        return out, results
+
     def running(self):
         print(f"===========================")
         print(f"project : {self.project['project']['project']['id']}")
@@ -151,7 +152,7 @@ class image_feature:
             self.record_started = False
             self.snd_data = []
             self.q.queue.clear()
-            
+
             self.audio_sub = rospy.Subscriber("audio_int", kidbright_tpu.msg.int1d, self.audio_callback, queue_size=4)
 
             timeout = time.time() + TIMEOUT_SEC
@@ -167,16 +168,17 @@ class image_feature:
                 print('Number of frames recorded: ' + str(len(self.snd_data)))
                 # create mfcc
                 im_mfcc = self.draw_mfcc(self.snd_data, SAMPLE_RATE)
-                
+                out, results = self.classify(im_mfcc)
                 if len(out) == 1:
                     tpu_objects_msg = tpu_objects()
-
+                    print(out)
+                    print(results)
                     if self.labels:
                         target_id = out[0]
                         target_score = results[out[0]]
                         target_label = self.labels[target_id]
-                        text = f"{target_label} {target_score:0.2f}"
-                        image_np = cv2.putText(image_np, text, (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 1)
+                        # text = f"{target_label} {target_score:0.2f}"
+                        # image_np = cv2.putText(image_np, text, (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 1)
                         tpu_object_m = tpu_object()
                         tpu_object_m.cx = 0
                         tpu_object_m.cy = 0
@@ -186,11 +188,10 @@ class image_feature:
                         tpu_object_m.confident = target_score
                         tpu_objects_msg.tpu_objects.append(tpu_object_m)
 
-        self.tpu_objects_pub.publish(tpu_objects_msg)
-
+            self.tpu_objects_pub.publish(tpu_objects_msg)
 
 if __name__ == '__main__':
-    ic = image_feature(sys.argv[1], sys.argv[2])
+    ic = image_feature(sys.argv[1], float(sys.argv[2]))
     try:
         rospy.spin()
     except KeyboardInterrupt:

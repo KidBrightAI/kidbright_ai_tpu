@@ -24,15 +24,9 @@ CHUNK_SIZE = 2205
 FORMAT = pyaudio.paInt16
 SAMPLE_RATE = 44100
 N_CHANNEL = 1
-MAX_CHUNK = 50
+MAX_CHUNK = 30
 #===================================#
 
-
-def is_silent(snd_data, pub, thres):
-    xx = np.frombuffer(snd_data, dtype=snd_data.typecode).astype(np.float32)
-    volume_norm = np.linalg.norm(xx/65536.0)*10
-    pub.publish(volume_norm)
-    return volume_norm < thres
 
 def find_device():
     p = pyaudio.PyAudio()
@@ -46,7 +40,6 @@ def find_device():
     return device_index, devinfo
 
 def audio_node():
-    pub_a = rospy.Publisher('a1', String, queue_size=10)
     pub_aint = rospy.Publisher('audio_int', int1d, queue_size=10)
     pub_sound_db = rospy.Publisher('sound_level', Float32, queue_size=10)
 
@@ -67,15 +60,15 @@ def audio_node():
         return
 
     print("======= start audio node with params ========")
-    print(f"Card Device Index : {device_index}") 
-    print(f"Sample Rate : {SAMPLE_RATE}")    
-    print(f"Channel : {N_CHANNEL}") 
+    print(f"Card Device Index : {device_index}")
+    print(f"Sample Rate : {SAMPLE_RATE}")
+    print(f"Channel : {N_CHANNEL}")
     print(f"Threshold : {THRESHOLD}")
     print(f"Chunk Size : {CHUNK_SIZE}")
     print(f"Selected Device Name : {devinfo.get('name')}")
     print(f"Selected Device Max CH : {devinfo.get('maxInputChannels')}")
     print('=============================================')
-    
+
     p = pyaudio.PyAudio()
     stream = p.open(format=FORMAT, channels=N_CHANNEL, rate=SAMPLE_RATE,
         input=True, output=False, input_device_index=device_index,
@@ -86,33 +79,19 @@ def audio_node():
 
     while not rospy.is_shutdown():
         snd_data = array('h', stream.read(CHUNK_SIZE)) #len snd_data = 2205
-
+        
         if byteorder == 'big':
             snd_data.byteswap()
 
-        silent = is_silent(snd_data, pub_sound_db  ,THRESHOLD)
-
-        if not record_started and not silent: # when voice and ready state
-            record_started = True
-            print("start record")
-
-        if record_started:
-            num_chunk += 1
-            #--- base64 publish
-            audio_bytes = bytearray(snd_data)
-            audio_str = base64.b64encode(audio_bytes)
-            pub_a.publish(audio_str)
-
-            #--- integer publish
-            audio_int1d = int1d()
-            audio_int1d.data = snd_data
-            pub_aint.publish(audio_int1d)
-
-            #--- stop record
-            if num_chunk >= MAX_CHUNK:
-                num_chunk = 0
-                record_started = False
-                print("end record")
+        # publish rms
+        xx = np.frombuffer(snd_data, dtype=snd_data.typecode).astype(np.float32)
+        volume_norm = np.linalg.norm(xx/65536.0)*10
+        pub_sound_db.publish(volume_norm)
+    
+        #--- integer publish
+        audio_int1d = int1d()
+        audio_int1d.data = snd_data
+        pub_aint.publish(audio_int1d)
 
     stream.stop_stream()
     stream.close()
