@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys, time, os, io, json
+import sys, time, os, io, json, base64
 import numpy as np
 import cv2
 from queue import Queue
@@ -15,7 +15,9 @@ from PIL import ImageFont
 from python_speech_features import mfcc
 
 # Ros Messages
+import sensor_msgs.msg
 from sensor_msgs.msg import CompressedImage
+from std_msgs.msg import String
 from geometry_msgs.msg import Twist
 import kidbright_tpu.msg
 from kidbright_tpu.msg import tpu_object
@@ -58,7 +60,7 @@ class image_feature:
         rospy.init_node('voice_class', anonymous=False)
 
         # To publish topic
-        self.mfcc_pub = rospy.Publisher("/output/image_detected/mfcc", CompressedImage, queue_size = 5, tcp_nodelay=False)
+        self.mfcc_pub = rospy.Publisher("/output/mfcc", String, queue_size = 5, tcp_nodelay=False)
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
         self.status_pub = rospy.Publisher("/voice_class/status", String, queue_size=5,tcp_nodelay = False)
 
@@ -159,13 +161,7 @@ class image_feature:
             self.audio_sub = rospy.Subscriber("audio_int", kidbright_tpu.msg.int1d, self.audio_callback, queue_size=4)
             self.status_pub.publish('START')
 
-            timeout = time.time() + TIMEOUT_SEC
             while self.q.empty():
-                if time.time() > timeout:
-                    self.q.put(0)
-                    self.audio_sub.unregister()
-                    self.status_pub.publish('TIME_OUT')
-                    break
                 rospy.sleep(0.1)
     
             record_result = self.q.get()
@@ -176,11 +172,11 @@ class image_feature:
                 im_mfcc = self.draw_mfcc(self.snd_data, SAMPLE_RATE)
                 
                 # pub mfcc 
-                img_msg = CompressedImage()
-                img_msg.header.stamp = rospy.Time.now()
-                img_msg.format = "jpeg"
-                img_msg.data = np.array(im_mfcc).tobytes()
-                self.mfcc_pub.publish(img_msg)
+                with io.BytesIO() as buf_mfccf:
+                    im_mfcc.save(buf_mfccf, format="JPEG")
+                    buf_mfccf.seek(0)
+                    mfcc_str = base64.b64encode(buf_mfccf.read()).decode("ascii")
+                self.mfcc_pub.publish(mfcc_str)
                 
                 #classify
                 out, results = self.classify(im_mfcc)
