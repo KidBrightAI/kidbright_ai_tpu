@@ -42,7 +42,7 @@ class image_feature:
         with open(path + '/project.json') as pjson:
             self.project = json.load(pjson)
         self.labels = self.load_labels(path + '/labels.txt') 
-        self.nFrame = self.project["project"]["project"]["options"]["delay"] // 1000 * FRAME_PER_SEC
+        self.nFrame = self.project["project"]["project"]["options"]["duration"] // 1000 * FRAME_PER_SEC
         self.threshold = threshold
 
         try:
