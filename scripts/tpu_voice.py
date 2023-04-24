@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys, time, os, io, json
+import sys, time, os, io, json, base64
 import numpy as np
 import cv2
 from queue import Queue
@@ -15,6 +15,7 @@ from PIL import ImageFont
 from python_speech_features import mfcc
 
 # Ros Messages
+import sensor_msgs.msg
 from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import String
 from geometry_msgs.msg import Twist
@@ -59,7 +60,7 @@ class image_feature:
         rospy.init_node('voice_class', anonymous=False)
 
         # To publish topic
-        self.mfcc_pub = rospy.Publisher("/output/image_detected/compressed", CompressedImage, queue_size = 5, tcp_nodelay=False)
+        self.mfcc_pub = rospy.Publisher("/output/mfcc", String, queue_size = 5, tcp_nodelay=False)
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
         self.status_pub = rospy.Publisher("/voice_class/status", String, queue_size=5,tcp_nodelay = False)
 
@@ -158,21 +159,25 @@ class image_feature:
             self.audio_sub = rospy.Subscriber("audio_int", kidbright_tpu.msg.int1d, self.audio_callback, queue_size=4)
             self.status_pub.publish('START')
 
-            timeout = time.time() + TIMEOUT_SEC
             while self.q.empty():
-                if time.time() > timeout:
-                    self.q.put(0)
-                    self.audio_sub.unregister()
-                    self.status_pub.publish('TIME_OUT')
-                    break
                 rospy.sleep(0.1)
     
             record_result = self.q.get()
             if record_result == 1:
                 print('Number of frames recorded: ' + str(len(self.snd_data)))
+                
                 # create mfcc
                 im_mfcc = self.draw_mfcc(self.snd_data, SAMPLE_RATE)
+                #classify
                 out, results = self.classify(im_mfcc)
+                
+                # pub mfcc 
+                with io.BytesIO() as buf_mfccf:
+                    im_mfcc.save(buf_mfccf, format="JPEG")
+                    buf_mfccf.seek(0)
+                    mfcc_str = base64.b64encode(buf_mfccf.read()).decode("ascii")
+                self.mfcc_pub.publish(mfcc_str)
+                
                 if len(out) == 1:
                     tpu_objects_msg = tpu_objects()
                     print(out)
@@ -193,7 +198,7 @@ class image_feature:
                         tpu_object_m.confident = target_score
                         tpu_objects_msg.tpu_objects.append(tpu_object_m)
 
-            self.tpu_objects_pub.publish(tpu_objects_msg)
+                        self.tpu_objects_pub.publish(tpu_objects_msg)
 
 if __name__ == '__main__':
     ic = image_feature(sys.argv[1], float(sys.argv[2]))
