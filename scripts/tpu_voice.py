@@ -39,9 +39,9 @@ MFCC_NUM = 16
 class image_feature:
     def __init__(self, path, threshold):
         # topic where we publish
-        self.labels = self.load_labels(path + '/labels.txt') 
         with open(path + '/project.json') as pjson:
             self.project = json.load(pjson)
+        self.labels = self.load_labels(path + '/labels.txt') 
         self.nFrame = self.project["project"]["project"]["options"]["delay"] // 1000 * FRAME_PER_SEC
         self.threshold = threshold
 
@@ -82,7 +82,7 @@ class image_feature:
                 return [line.strip() for line in f.readlines()]
         else:
             #parse label from project.json
-            labels = self.project["project"]["modelLabel"]
+            labels = self.project["project"]["project"]["modelLabel"]
             print("Project Label : ", ",".join(labels))
             return labels
 
