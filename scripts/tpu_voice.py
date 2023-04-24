@@ -16,6 +16,7 @@ from python_speech_features import mfcc
 
 # Ros Messages
 from sensor_msgs.msg import CompressedImage
+from std_msgs.msg import String
 from geometry_msgs.msg import Twist
 import kidbright_tpu.msg
 from kidbright_tpu.msg import tpu_object
@@ -38,7 +39,7 @@ class image_feature:
     def __init__(self, path, threshold):
         # topic where we publish
         self.labels = self.load_labels(path + '/labels.txt') 
-        with open(path + 'project.json') as pjson:
+        with open(path + '/project.json') as pjson:
             self.project = json.load(pjson)
         self.nFrame = self.project["project"]["project"]["options"]["delay"] // 1000 * FRAME_PER_SEC
         self.threshold = threshold
@@ -60,7 +61,8 @@ class image_feature:
         # To publish topic
         self.mfcc_pub = rospy.Publisher("/output/image_detected/compressed", CompressedImage, queue_size = 5, tcp_nodelay=False)
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
-        
+        self.status_pub = rospy.Publisher("/voice_class/status", String, queue_size=5,tcp_nodelay = False)
+
         self.q = Queue()    
         self.frame_counter = 0
         self.snd_data = []
@@ -79,12 +81,9 @@ class image_feature:
                 return [line.strip() for line in f.readlines()]
         else:
             #parse label from project.json
-            project_json = os.path.join(os.path.dirname(filename), "project.json")
-            with open(project_json, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                labels = data["project"]["project"]["modelLabel"]
-                print("Project Label : ", ",".join(labels))
-                return labels
+            labels = self.project["project"]["project"]["modelLabel"]
+            print("Project Label : ", ",".join(labels))
+            return labels
 
     def preprocess(self, img):
         img = img.astype(np.float32)
@@ -98,6 +97,7 @@ class image_feature:
         # message data len = 2205
         if self.is_silent(msg.data, self.threshold) == False and self.record_started == False:
             print("start record")
+            self.status_pub.publish('START_RECORD')
             self.record_started = True
             
         if self.record_started:
@@ -107,6 +107,7 @@ class image_feature:
 
         if self.frame_counter >= self.nFrame:
             print("end record, unsubscribe")
+            self.status_pub.publish('END_RECORD')
             self.audio_sub.unregister()
             self.q.put(1)
     
@@ -128,6 +129,7 @@ class image_feature:
 
     def classify(self, im):
         image_np = np.array(im) 
+        image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
         input_np = cv2.resize(image_np.copy(), (self.input_width, self.input_height))
         input_np = self.preprocess(input_np)
         input_np = np.expand_dims(input_np, 0)
@@ -154,12 +156,14 @@ class image_feature:
             self.q.queue.clear()
 
             self.audio_sub = rospy.Subscriber("audio_int", kidbright_tpu.msg.int1d, self.audio_callback, queue_size=4)
+            self.status_pub.publish('START')
 
             timeout = time.time() + TIMEOUT_SEC
             while self.q.empty():
                 if time.time() > timeout:
                     self.q.put(0)
                     self.audio_sub.unregister()
+                    self.status_pub.publish('TIME_OUT')
                     break
                 rospy.sleep(0.1)
     
@@ -173,6 +177,7 @@ class image_feature:
                     tpu_objects_msg = tpu_objects()
                     print(out)
                     print(results)
+                    self.status_pub.publish('CLASSIFY')
                     if self.labels:
                         target_id = out[0]
                         target_score = results[out[0]]
