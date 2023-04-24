@@ -82,7 +82,7 @@ class image_feature:
                 return [line.strip() for line in f.readlines()]
         else:
             #parse label from project.json
-            labels = self.project["project"]["project"]["modelLabel"]
+            labels = self.project["project"]["modelLabel"]
             print("Project Label : ", ",".join(labels))
             return labels
 
