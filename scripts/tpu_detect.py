@@ -37,10 +37,9 @@ class image_feature:
         '''Initialize ros publisher, ros subscriber'''
         # path = "/home/pi/kbai-server/inferences/yolo"
         self.threshold = threshold
-        self.labels = self.read_label_file(path + '/labels.txt')
-        
-        project_json = self.read_json_file(path + "/project.json")
-        self.anchors = project_json["project"]["project"]["anchors"]
+        self.project = self.read_json_file(path + "/project.json")
+        self.labels = self.load_labels(path + '/labels.txt')
+        self.anchors = self.project["project"]["project"]["anchors"]
         try:
             self.interpreter = make_interpreter(path + '/model_edgetpu.tflite')
             self.mode = "CORAL"
@@ -52,12 +51,15 @@ class image_feature:
         self.input_details = self.interpreter.get_input_details()[0]
         _, self.input_height, self.input_width, _ = self.input_details['shape']
         self.output_details = self.interpreter.get_output_details()[0]
+        print(self.output_details['shape'])
         try:
             self.output_scale = self.output_details["quantization_parameters"]["scales"][0]
             self.output_zero_points = self.output_details["quantization_parameters"]["zero_points"][0]
             self.quantize = True
+            print("Model Quantized")
         except:
             self.quantize = False
+            print("Model Not Quantized")
         
         #YOLO 
         if self.anchors:
@@ -77,11 +79,15 @@ class image_feature:
             with open(file) as f:
                 return json.load(f)
 
-    def read_label_file(self, file_path):
-        with open(file_path,'r') as f:
-            line = f.readlines()
-            return line[0].split(",")
-        return False
+    def load_labels(self, filename):
+        if os.path.exists(filename):
+            with open(filename, 'r') as f:
+                return [line.strip() for line in f.readlines()]
+        else:
+            #parse label from project.json
+            labels = self.project["project"]["project"]["modelLabel"]
+            print("Project Label : ", ",".join(labels))
+            return labels
     
     def preprocess(self, img):
         
@@ -109,7 +115,8 @@ class image_feature:
         image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB) 
 
         input_np = cv2.resize(image_np.copy(), (self.input_width, self.input_height)) #shape = 224,320,3
-        input_np = self.preprocess(input_np)
+        if not self.quantize:
+            input_np = self.preprocess(input_np)
         input_np = np.expand_dims(input_np, 0) #shape 
         self.interpreter.set_tensor(self.input_details["index"], input_np)
         self.interpreter.invoke()
@@ -119,7 +126,8 @@ class image_feature:
         netout = self.interpreter.get_tensor(self.output_details['index']).astype(np.float32)
         if self.quantize:
             netout = (netout - self.output_zero_points) * self.output_scale
-        netout = netout.reshape(7, 10, 5, 7)
+        print(netout.shape)
+        netout = netout.reshape(7, 10, 5, 350 // netout.shape[1])
         
         boxes, probs = self.decoder.run(netout, self.threshold)
 
