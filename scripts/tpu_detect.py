@@ -83,6 +83,16 @@ class image_feature:
             return line[0].split(",")
         return False
     
+    def preprocess(self, img):
+        
+        img = img.astype(np.float32)
+        img = img / 255.
+        img = img - 0.5
+        img = img * 2.
+        img = img[:, :, ::-1]
+        
+        return img
+
     def bbox_to_xy(self,boxes,w,h):
         minmax_boxes = to_minmax(boxes)
         minmax_boxes[:,0] *= w
@@ -99,6 +109,7 @@ class image_feature:
         image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB) 
 
         input_np = cv2.resize(image_np.copy(), (self.input_width, self.input_height)) #shape = 224,320,3
+        input_np = self.preprocess(input_np)
         input_np = np.expand_dims(input_np, 0) #shape 
         self.interpreter.set_tensor(self.input_details["index"], input_np)
         self.interpreter.invoke()
