@@ -39,6 +39,7 @@ class image_feature:
         self.threshold = threshold
         self.project = self.read_json_file(path + "/project.json")
         self.labels = self.load_labels(path + '/labels.txt')
+        print(self.labels)
         self.anchors = self.project["project"]["project"]["anchors"]
         try:
             self.interpreter = make_interpreter(path + '/model_edgetpu.tflite')
