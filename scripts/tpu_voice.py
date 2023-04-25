@@ -79,8 +79,7 @@ class image_feature:
     def load_labels(self, filename):
         if os.path.exists(filename):
             with open(filename, 'r') as f:
-                first_line = f.readline()
-                return first_line.split(",")
+                return [line.strip() for line in f.readlines()]
         else:
             #parse label from project.json
             labels = self.project["project"]["project"]["modelLabel"]
