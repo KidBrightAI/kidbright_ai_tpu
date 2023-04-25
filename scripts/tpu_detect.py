@@ -126,8 +126,7 @@ class image_feature:
         netout = self.interpreter.get_tensor(self.output_details['index']).astype(np.float32)
         if self.quantize:
             netout = (netout - self.output_zero_points) * self.output_scale
-        print(netout.shape)
-        netout = netout.reshape(7, 10, 5, 350 // netout.shape[1])
+        netout = netout.reshape(7, 10, 5, netout.shape[3] // 5)
         
         boxes, probs = self.decoder.run(netout, self.threshold)
 
