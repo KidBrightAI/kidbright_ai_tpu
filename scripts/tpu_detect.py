@@ -33,7 +33,7 @@ VERBOSE=False
 
 class image_feature:
 
-    def __init__(self, path, threshold = 0.5):
+    def __init__(self, path, threshold = 0.3):
         '''Initialize ros publisher, ros subscriber'''
         # path = "/home/pi/kbai-server/inferences/yolo"
         self.threshold = threshold
