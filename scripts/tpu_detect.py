@@ -45,7 +45,7 @@ class image_feature:
             self.interpreter = make_interpreter(path + '/model_edgetpu.tflite')
             self.mode = "CORAL"
         except:
-            self.interpreter = tflite.Interpreter(path + '/model_edgetpu.tflite')
+            self.interpreter = tflite.Interpreter(path + '/model_edgetpu.tflite', num_threads=3)
             self.mode = "LEGACY"
             
         self.interpreter.allocate_tensors()
