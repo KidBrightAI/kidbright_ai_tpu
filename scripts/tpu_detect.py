@@ -21,6 +21,7 @@ from PIL import ImageDraw
 from PIL import ImageFont
 
 from sensor_msgs.msg import CompressedImage
+from std_msgs.msg import String
 from geometry_msgs.msg import Twist
 from kidbright_tpu.msg import tpu_object
 from kidbright_tpu.msg import tpu_objects
@@ -72,6 +73,9 @@ class image_feature:
         #Publish
         self.image_pub = rospy.Publisher("/output/image_detected/compressed", CompressedImage, queue_size = 5, tcp_nodelay=False)
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
+        self.object_json_pub = rospy.Publisher("/object_json", String, queue_size = 5, tcp_nodelay=False)
+        self.ready_pub = rospy.Publisher("/ready", String, queue_size = 5, tcp_nodelay=False)
+        self.hot_loaded = False
         #Subscribe
         self.subscriber = rospy.Subscriber("/output/image_raw/compressed", CompressedImage, self.callback,  queue_size = 5, tcp_nodelay=False)
     
@@ -131,9 +135,13 @@ class image_feature:
         netout = netout.reshape(7, 10, 5, netout.shape[3] // 5)
         
         boxes, probs = self.decoder.run(netout, self.threshold)
+        if self.hot_loaded == False:
+            self.hot_loaded = True
+            self.ready_pub.publish("ready")
 
         tpu_objects_msg = tpu_objects()
         if len(boxes) > 0:
+            boxes_object = []
             boxes = self.bbox_to_xy(boxes,image_np.shape[1],image_np.shape[0])
             if self.labels:
                 for box, classes in zip(boxes, probs):
@@ -156,6 +164,17 @@ class image_feature:
                     tpu_object_m.confident = classes[target_class_index]
                     tpu_objects_msg.tpu_objects.append(tpu_object_m)
                     
+                    boxes_object.append({
+                        "x1": x1,
+                        "y1": y1,
+                        "x2": x2,
+                        "y2": y2,
+                        "label": self.labels[target_class_index],
+                        "confident": classes[target_class_index]
+                    })
+                
+                self.object_json_pub.publish(json.dumps(boxes_object))
+
         t2 = time.time()
         fps = 1/(t2-t1)
         fps_str = 'FPS = %.2f' % fps

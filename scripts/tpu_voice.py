@@ -63,6 +63,8 @@ class image_feature:
         self.mfcc_pub = rospy.Publisher("/output/mfcc", String, queue_size = 5, tcp_nodelay=False)
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
         self.status_pub = rospy.Publisher("/voice_class/status", String, queue_size=5,tcp_nodelay = False)
+        self.ready_pub = rospy.Publisher("/ready", String, queue_size = 5, tcp_nodelay=False)
+        self.hot_loaded = False
 
         self.q = Queue()    
         self.frame_counter = 0
@@ -170,7 +172,10 @@ class image_feature:
                 im_mfcc = self.draw_mfcc(self.snd_data, SAMPLE_RATE)
                 #classify
                 out, results = self.classify(im_mfcc)
-                
+                # publish ready status
+                if self.hot_loaded == False:
+                    self.hot_loaded = True
+                    self.ready_pub.publish('READY')
                 # pub mfcc 
                 with io.BytesIO() as buf_mfccf:
                     im_mfcc.save(buf_mfccf, format="JPEG")

@@ -17,7 +17,7 @@ from sensor_msgs.msg import CompressedImage
 from geometry_msgs.msg import Twist
 from kidbright_tpu.msg import tpu_object
 from kidbright_tpu.msg import tpu_objects
-
+from std_msgs.msg import String
 try:
     from pycoral.adapters import classify
     from pycoral.adapters import common
@@ -48,6 +48,8 @@ class image_feature:
         # To publish topic
         self.image_pub = rospy.Publisher("/output/image_detected/compressed", CompressedImage, queue_size = 5, tcp_nodelay=False)
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
+        self.ready_pub = rospy.Publisher("/ready", String, queue_size = 5, tcp_nodelay=False)
+        self.hot_loaded = False
 
         # subscribed Topic
         self.subscriber = rospy.Subscriber("/output/image_raw/compressed", CompressedImage, self.callback,  queue_size = 5, tcp_nodelay=False)
@@ -95,6 +97,10 @@ class image_feature:
         results = np.squeeze(output_data)
         out = results.argsort()[-1:][::-1]
 
+        # publish ready topic
+        if self.hot_loaded == False:
+            self.hot_loaded = True
+            self.ready_pub.publish("ready")
         #out = classify.get_classes(self.interpreter, top_k=1)
 
         tpu_objects_msg = tpu_objects()
