@@ -35,7 +35,7 @@ class image_feature:
             self.interpreter = make_interpreter(path + '/model_edgetpu.tflite')
             self.mode = "CORAL"
         except:
-            self.interpreter = tflite.Interpreter(path + '/model_edgetpu.tflite')
+            self.interpreter = tflite.Interpreter(path + '/model_edgetpu.tflite', num_threads=3)
             self.mode = "LEGACY"
         self.interpreter.allocate_tensors()
         self.input_details = self.interpreter.get_input_details()[0]
@@ -46,13 +46,13 @@ class image_feature:
         rospy.init_node('image_class', anonymous=False)
 
         # To publish topic
-        self.image_pub = rospy.Publisher("/output/image_detected/compressed", CompressedImage, queue_size = 5, tcp_nodelay=False)
+        self.image_pub = rospy.Publisher("/output/image_detected/compressed", CompressedImage, queue_size = None, tcp_nodelay=True)
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
         self.ready_pub = rospy.Publisher("/ready", String, queue_size = 5, tcp_nodelay=False)
         self.hot_loaded = False
 
         # subscribed Topic
-        self.subscriber = rospy.Subscriber("/output/image_raw/compressed", CompressedImage, self.callback,  queue_size = 5, tcp_nodelay=False)
+        self.subscriber = rospy.Subscriber("/output/image_raw/compressed", CompressedImage, self.callback,  queue_size = None, tcp_nodelay=True)
         self.size = 320, 240
         
     def load_labels(self, filename):
