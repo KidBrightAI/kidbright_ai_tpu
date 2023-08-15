@@ -71,13 +71,13 @@ class image_feature:
         rospy.init_node('image_feature', anonymous=False)
 
         #Publish
-        self.image_pub = rospy.Publisher("/output/image_detected/compressed", CompressedImage, queue_size = 5, tcp_nodelay=False)
+        self.image_pub = rospy.Publisher("/output/image_detected/compressed", CompressedImage, queue_size = None, tcp_nodelay=True)
         self.tpu_objects_pub = rospy.Publisher("/tpu_objects", tpu_objects, queue_size = 5, tcp_nodelay=False)
         self.object_json_pub = rospy.Publisher("/object_json", String, queue_size = 5, tcp_nodelay=False)
         self.ready_pub = rospy.Publisher("/ready", String, queue_size = 5, tcp_nodelay=False)
         self.hot_loaded = False
         #Subscribe
-        self.subscriber = rospy.Subscriber("/output/image_raw/compressed", CompressedImage, self.callback,  queue_size = 5, tcp_nodelay=False)
+        self.subscriber = rospy.Subscriber("/output/image_raw/compressed", CompressedImage, self.callback,  queue_size = None, tcp_nodelay=True)
     
     def read_json_file(self, file):
         if os.path.exists(file):
