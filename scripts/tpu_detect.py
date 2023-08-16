@@ -173,7 +173,7 @@ class image_feature:
                         "confident": classes[target_class_index]
                     })
                 
-                self.object_json_pub.publish(json.dumps(boxes_object))
+                #self.object_json_pub.publish(json.dumps(boxes_object))
 
         t2 = time.time()
         fps = 1/(t2-t1)
