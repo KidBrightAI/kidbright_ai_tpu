@@ -12,7 +12,7 @@ def csi_pipeline(
     capture_height=480,
     display_width=640,
     display_height=480,
-    framerate=10,
+    framerate=7,
     flip_method=0
 ):
     return ('nvarguscamerasrc sensor-id=%d ! '
